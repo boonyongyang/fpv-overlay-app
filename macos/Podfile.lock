@@ -1,0 +1,60 @@
+PODS:
+  - app_badge_plus (1.2.6):
+    - FlutterMacOS
+  - desktop_drop (0.0.1):
+    - FlutterMacOS
+  - DockProgress (3.2.0)
+  - file_selector_macos (0.0.1):
+    - FlutterMacOS
+  - FlutterMacOS (1.0.0)
+  - local_notifier (0.1.0):
+    - FlutterMacOS
+  - macos_dock_progress (1.1.0):
+    - DockProgress
+    - FlutterMacOS
+  - shared_preferences_foundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - app_badge_plus (from `Flutter/ephemeral/.symlinks/plugins/app_badge_plus/macos`)
+  - desktop_drop (from `Flutter/ephemeral/.symlinks/plugins/desktop_drop/macos`)
+  - file_selector_macos (from `Flutter/ephemeral/.symlinks/plugins/file_selector_macos/macos`)
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - local_notifier (from `Flutter/ephemeral/.symlinks/plugins/local_notifier/macos`)
+  - macos_dock_progress (from `Flutter/ephemeral/.symlinks/plugins/macos_dock_progress/macos`)
+  - shared_preferences_foundation (from `Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin`)
+
+SPEC REPOS:
+  trunk:
+    - DockProgress
+
+EXTERNAL SOURCES:
+  app_badge_plus:
+    :path: Flutter/ephemeral/.symlinks/plugins/app_badge_plus/macos
+  desktop_drop:
+    :path: Flutter/ephemeral/.symlinks/plugins/desktop_drop/macos
+  file_selector_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/file_selector_macos/macos
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  local_notifier:
+    :path: Flutter/ephemeral/.symlinks/plugins/local_notifier/macos
+  macos_dock_progress:
+    :path: Flutter/ephemeral/.symlinks/plugins/macos_dock_progress/macos
+  shared_preferences_foundation:
+    :path: Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin
+
+SPEC CHECKSUMS:
+  app_badge_plus: f47ad0952fcd28b92ce9bad98c565bf0c4a3fd28
+  desktop_drop: 69eeff437544aa619c8db7f4481b3a65f7696898
+  DockProgress: 94765d097d5c54579bf93385b5be71bd6a74fdf6
+  file_selector_macos: cc3858c981fe6889f364731200d6232dac1d812d
+  FlutterMacOS: 8f6f14fa908a6fb3fba0cd85dbd81ec4b251fb24
+  local_notifier: e9506bc66fc70311e8bc7291fb70f743c081e4ff
+  macos_dock_progress: aea73a843356a3619bdc7ed8e859908deaa2bd6f
+  shared_preferences_foundation: fcdcbc04712aee1108ac7fda236f363274528f78
+
+PODFILE CHECKSUM: ca99d1c20c03b0d8bbc83240861248cf04a75bc5
+
+COCOAPODS: 1.16.2

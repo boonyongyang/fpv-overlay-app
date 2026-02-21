@@ -1,0 +1,11 @@
+# Task List
+
+- [ ] Plan the Flutter macOS app architecture
+- [ ] Initialize Flutter project in `fpv-overlay-macos`
+- [ ] Configure macOS entitlements (network, file access, sandbox)
+- [ ] Add dependencies (`provider`, `file_selector`, `desktop_drop`)
+- [ ] Implement `models` and `services` (CLI process runner, file picker)
+- [ ] Implement `providers` (State management)
+- [ ] Build basic UI layout (Drag & drop, file selection)
+- [ ] Implement command execution and progress tracking
+- [ ] Polish UI and documentation for GitHub showcase
