@@ -70,32 +70,45 @@ class PerformanceInsightsCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _ReportMetric(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final metrics = [
+                _ReportMetric(
                   label: 'Avg Render Time',
                   value: '${avgRenderTime.inSeconds}s',
                   icon: Icons.speed_rounded,
                 ),
-              ),
-              Expanded(
-                child: _ReportMetric(
+                _ReportMetric(
                   label: 'Total Time',
                   value: _formatDuration(totalTimeSaved),
                   icon: Icons.timer_rounded,
                 ),
-              ),
-              Expanded(
-                child: _ReportMetric(
+                _ReportMetric(
                   label: 'CPU Load',
                   value: completed.last.cpuUsageAtStart != null
                       ? '${completed.last.cpuUsageAtStart!.toStringAsFixed(0)}%'
                       : 'N/A',
                   icon: Icons.memory_rounded,
                 ),
-              ),
-            ],
+              ];
+
+              if (constraints.maxWidth < 720) {
+                return Column(
+                  children: [
+                    for (var index = 0; index < metrics.length; index++) ...[
+                      if (index > 0) const SizedBox(height: 12),
+                      metrics[index],
+                    ],
+                  ],
+                );
+              }
+
+              return Row(
+                children: metrics
+                    .map((metric) => Expanded(child: metric))
+                    .toList(growable: false),
+              );
+            },
           ),
         ],
       ),
@@ -123,28 +136,35 @@ class _ReportMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontSize: 10,
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withAlpha(145),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
-            ),
-          ],
-        ),
-      ],
+              Text(
+                label,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

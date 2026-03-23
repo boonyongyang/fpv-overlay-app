@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fpv_overlay_app/core/constants/app_identity.dart';
 import 'package:fpv_overlay_app/core/utils/platform_utils.dart';
 import 'package:fpv_overlay_app/presentation/widgets/fpv_logo.dart';
 
@@ -38,7 +39,7 @@ class HelpPage extends StatelessWidget {
           const SizedBox(height: 48),
           const SizedBox(height: 16),
           Text(
-            'Support & FAQ',
+            'Support & Reference',
             style: theme.textTheme.headlineLarge?.copyWith(
               fontWeight: FontWeight.w900,
               letterSpacing: -1,
@@ -46,7 +47,7 @@ class HelpPage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Everything you need to know about FPV Overlay Toolbox.',
+            'Practical guidance for matching files, using the desktop workspace efficiently, and troubleshooting local runtime issues.',
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -55,20 +56,35 @@ class HelpPage extends StatelessWidget {
           const _HelpSection(
             title: 'Getting Started',
             items: [
-              _HelpItem(
-                question: 'How do I add videos?',
-                answer:
-                    'You can drag and drop your video files (.mp4 or .mov) directly onto the Overlay Queue, or use the "Select Pairs" button.',
+              _HelpCard(
+                icon: Icons.add_photo_alternate_rounded,
+                title: 'How do I add videos?',
+                description:
+                    'Drag and drop your video files directly onto the Overlay Queue, or use the "Add Task" button to explicitly choose SRT or OSD rendering.',
               ),
-              _HelpItem(
-                question: 'What are "Telemetry Files"?',
-                answer:
-                    'These are data logs from your flight controller. We support .srt (DJI/Subtitles) and .osd (Betaflight/Inav) formats.',
+              _HelpCard(
+                icon: Icons.description_rounded,
+                title: 'What are Telemetry Files?',
+                description:
+                    'Data logs from your flight controller. We support .srt (DJI/Subtitles) and .osd (Betaflight/Inav) formats.',
               ),
-              _HelpItem(
-                question: 'How does automatic matching work?',
-                answer:
-                    'If your video is named DJI_001.mp4 and your telemetry is DJI_001.srt, the app will automatically pair them if they are in the same folder or selected together.',
+              _HelpCard(
+                icon: Icons.sync_rounded,
+                title: 'Automatic matching',
+                description:
+                    'If your video is named DJI_001.mp4 and your telemetry is DJI_001.srt, the app will automatically pair them if they are in the same folder.',
+              ),
+              _HelpCard(
+                icon: Icons.keyboard_command_key_rounded,
+                title: 'Command palette',
+                description:
+                    'Press Cmd/Ctrl + K anywhere in the app shell to jump to queue actions, navigation, diagnostics, and the workflow tour.',
+              ),
+              _HelpCard(
+                icon: Icons.article_rounded,
+                title: 'Where are task details?',
+                description:
+                    'Open a task to view its full renderer log, queue lifecycle messages, and failure trace instead of using an inline inspector.',
               ),
             ],
           ),
@@ -76,73 +92,23 @@ class HelpPage extends StatelessWidget {
           const _HelpSection(
             title: 'Supported File Types',
             items: [
-              _HelpItem(
-                question: 'Video Files (.mp4, .mov)',
-                answer:
-                    'The primary footage from your drone, action camera, or goggles. High resolution (4K/HD) is supported.',
+              _HelpCard(
+                icon: Icons.movie_rounded,
+                title: 'Video Files (.mp4, .mov)',
+                description:
+                    'Primary footage from drone/goggles. High resolution (4K/HD) is fully supported.',
               ),
-              _HelpItem(
-                question: 'Subtitle Metadata (.srt)',
-                answer:
-                    'Simple text-based telemetry files used for DJI (Caddx/Vista) and Walksnail overlays. These allow for fast rendering without re-encoding.',
+              _HelpCard(
+                icon: Icons.subtitles_rounded,
+                title: 'Subtitle Metadata (.srt)',
+                description:
+                    'Simple text-based logs (DJI, Walksnail). Fast rendering without re-encoding.',
               ),
-              _HelpItem(
-                question: 'Graphical OSD Logs (.osd)',
-                answer:
-                    'High-fidelity data logs usually exported from Blackbox. These allow the toolbox to recreate the full visual OSD with all flight metrics and gauges.',
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-          const _HelpSection(
-            title: 'Compatible Hardware',
-            items: [
-              _HelpItem(
-                question: 'DJI O3 Air Unit',
-                answer:
-                    'Supports both high-quality OSD Rendering and basic SRT subtitles. For OSD, ensure the "Canvas Mode" is set to HD in your Goggles. The telemetry is stored inside the MP4, but the engine handles extraction.',
-              ),
-              _HelpItem(
-                question: 'Caddx Vista & Original Air Unit',
-                answer:
-                    'Primarily supports SRT subtitles. Most firmwares generate a companion .srt file alongside the video on the SD card. Use the "SRT Fast" mode for zero re-encode time.',
-              ),
-              _HelpItem(
-                question: 'Betaflight & INAV (Blackbox)',
-                answer:
-                    'External telemetry logs (.osd files) can be generated from Blackbox logs using external tools. This app can then render those logs as a high-fidelity graphical overlay on any video source.',
-              ),
-              _HelpItem(
-                question: 'Walksnail Avatar / FatShark Dominator',
-                answer:
-                    'Similar to DJI O3, these systems generate .srt files. Pair them with your video for automated subtitle overlays.',
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-          const _HelpSection(
-            title: 'Community & Branding',
-            items: [
-              _HelpItem(
-                question: 'What does the new icon represent?',
-                answer:
-                    'Our solid cyan square icon represents the clean, high-performance nature of FPV racing. It symbolizes the precision and speed of our overlay engine.',
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-          const _HelpSection(
-            title: 'Technical Details',
-            items: [
-              _HelpItem(
-                question: 'Which overlay type should I choose?',
-                answer:
-                    'SRT is much faster but has basic subtitles. OSD Rendering creates a high-definition graphical overlay but takes longer to process as it re-encodes the video.',
-              ),
-              _HelpItem(
-                question: 'Where do my files go?',
-                answer:
-                    'The app will ask for an output directory when you start processing. All finished videos are saved as [original]_overlay.mp4.',
+              _HelpCard(
+                icon: Icons.graphic_eq_rounded,
+                title: 'Graphical OSD Logs (.osd)',
+                description:
+                    'High-fidelity logs from Blackbox. Recreates the full visual OSD gauges but requires full re-encode.',
               ),
             ],
           ),
@@ -150,50 +116,29 @@ class HelpPage extends StatelessWidget {
           const _HelpSection(
             title: 'Troubleshooting',
             items: [
-              _HelpItem(
-                question: 'The processing fails immediately.',
-                answer:
-                    'First check System Info to see which FFmpeg and Python '
-                    'paths the app resolved. Release builds can bundle those '
-                    'runtimes, but source builds rely on system installs. If '
-                    'the paths look wrong, reinstall the app or update your '
-                    'local FFmpeg/Python setup.',
+              _HelpCard(
+                icon: Icons.error_outline_rounded,
+                title: 'OSD rendering fails',
+                description:
+                    'Check Settings & Diagnostics to see which FFmpeg and Python paths were resolved. Packaged releases bundle them inside.',
               ),
-              _HelpItem(
-                question: 'OSD rendering fails with a "font" error.',
-                answer:
-                    'All 28 standard OSD font sheets are bundled inside the app, so this '
-                    'should not normally happen. If it does, check that the app was not '
-                    'moved out of the Applications folder (macOS) or that no files were '
-                    'deleted from the install directory.\n\n'
-                    'If you want to use custom fonts from O3_OverlayTool, open '
-                    'System Info → Application Preferences and set the '
-                    'O3_OverlayTool Directory to the folder containing your font PNGs.',
+              _HelpCard(
+                icon: Icons.warning_amber_rounded,
+                title: 'Sync Issues',
+                description:
+                    'The app assumes telemetry begins at the same time as the video. Discrepancies require adjusting start times.',
               ),
-              _HelpItem(
-                question:
-                    'OSD rendering fails with a "dependency" or "module" error.',
-                answer:
-                    'The app needs Python with numpy, pillow, and pandas available. '
-                    'Some releases may bundle that runtime; source builds resolve it '
-                    'from your machine.\n\n'
-                    'If you hit a module error, use "Copy Report" in System Info to see '
-                    'which Python interpreter was selected, then install the packages '
-                    'for that interpreter.',
+              _HelpCard(
+                icon: Icons.help_outline_rounded,
+                title: 'Files missing in queue',
+                description:
+                    'Both a video (.mp4) and matching telemetry (.srt/.osd) with the identical filename are required to form a task.',
               ),
-              _HelpItem(
-                question: 'The overlay is out of sync.',
-                answer:
-                    'The app assumes the telemetry starts at the same time as the video. Ensure your SD card was logging continuously.',
-              ),
-              _HelpItem(
-                question: 'Why are some files not appearing in the queue?',
-                answer:
-                    'The engine automatically filters out empty (0-byte) files. '
-                    'Additionally, the app requires both a video (.mp4/.mov) and '
-                    'a matching telemetry file (.srt/.osd) with the same filename '
-                    'to create a task. Folder scans are currently top-level only, '
-                    'so nested subfolders are ignored.',
+              _HelpCard(
+                icon: Icons.privacy_tip_rounded,
+                title: 'Is this app cloud-backed?',
+                description:
+                    'No. Media processing, queue diagnostics, and stats stay on the local machine. The app does not ship with analytics or remote crash reporting.',
               ),
             ],
           ),
@@ -206,36 +151,58 @@ class HelpPage extends StatelessWidget {
               border:
                   Border.all(color: theme.colorScheme.primary.withAlpha(100)),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.code_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 32,
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Open Source Project',
-                        style: theme.textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.code_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 32,
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Open Source Project',
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'The app is open source and the renderer is documented against upstream FPV overlay references. Use the repository for releases, issues, and implementation notes.',
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'This toolbox is free and open source. If you find a bug or want to contribute, visit our GitHub repository.',
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 20),
-                OutlinedButton(
-                  onPressed: () => PlatformUtils.openUrl(
-                    'https://github.com/YangBo17/fpv-overlay-app',
-                  ),
-                  child: const Text('View on GitHub'),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () =>
+                          PlatformUtils.openUrl(AppIdentity.repositoryUrl),
+                      child: const Text('View Repo'),
+                    ),
+                    OutlinedButton(
+                      onPressed: () =>
+                          PlatformUtils.openUrl(AppIdentity.releasesUrl),
+                      child: const Text('Download Releases'),
+                    ),
+                    OutlinedButton(
+                      onPressed: () => PlatformUtils.openUrl(
+                        AppIdentity.upstreamOsdOverlayUrl,
+                      ),
+                      child: const Text('OSD Reference'),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -249,7 +216,7 @@ class HelpPage extends StatelessWidget {
 
 class _HelpSection extends StatelessWidget {
   final String title;
-  final List<_HelpItem> items;
+  final List<Widget> items;
 
   const _HelpSection({required this.title, required this.items});
 
@@ -266,35 +233,55 @@ class _HelpSection extends StatelessWidget {
               ),
         ),
         const SizedBox(height: 16),
-        ...items,
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: items,
+        ),
       ],
     );
   }
 }
 
-class _HelpItem extends StatelessWidget {
-  final String question;
-  final String answer;
+class _HelpCard extends StatelessWidget {
+  final String title;
+  final String description;
+  final IconData icon;
 
-  const _HelpItem({required this.question, required this.answer});
+  const _HelpCard({
+    required this.title,
+    required this.description,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: ExpansionTile(
-        title: Text(
-          question,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        expandedAlignment: Alignment.topLeft,
+    final theme = Theme.of(context);
+    return Container(
+      width: 320,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withAlpha(50),
+        borderRadius: BorderRadius.circular(20),
+        border:
+            Border.all(color: theme.colorScheme.outlineVariant.withAlpha(50)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(icon, color: theme.colorScheme.primary, size: 36),
+          const SizedBox(height: 20),
           Text(
-            answer,
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: theme.colorScheme.onSurfaceVariant,
               height: 1.5,
+              fontSize: 14,
             ),
           ),
         ],
