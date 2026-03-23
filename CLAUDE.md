@@ -12,11 +12,14 @@ This project uses [FVM](https://fvm.app/) to pin the Flutter version (see `.fvmr
 
 ```bash
 make bootstrap        # Install Flutter deps + CocoaPods (first time setup)
-make check            # Run analyzer + tests (CI target)
+make check            # Run analyzer + tests (canonical CI gate)
 make format           # dart format lib test
 make analyze          # fvm flutter analyze
 make test             # fvm flutter test
 make runtime-check    # Verify ffmpeg and python3 are available
+
+# Run locally
+fvm flutter run -d macos
 
 # Single test file
 fvm flutter test test/application/providers/task_queue_provider_test.dart
@@ -63,6 +66,10 @@ All commands use `ProcessRunnerMixin` to stream subprocess output line-by-line v
 
 `TaskQueueProvider` is the core — holds `List<OverlayTask>`, handles file matching/merging, DJI split-recording fallback, and batch processing orchestration.
 
+`WorkspaceProvider` manages transient UI state: queue search text, status/type filters, sort mode, command palette visibility, and first-run onboarding visibility.
+
+`LocalStatsProvider` tracks persistent render stats (completed/failed/cancelled counts, recent run history capped at 50) backed by `LocalStatsService` via SharedPreferences.
+
 ### Platform Services
 
 `OsService` interface with platform implementations:
@@ -73,6 +80,10 @@ All commands use `ProcessRunnerMixin` to stream subprocess output line-by-line v
 ### Runtime Requirements
 
 The app invokes Python scripts bundled in `assets/bin/` (`osd_overlay.py`, `srt_overlay.py`). In release builds, precompiled binaries may replace these. Runtime needs: **FFmpeg** and **Python 3** (with numpy, Pillow, pandas).
+
+### Sample Media
+
+Sample media (`DJIG0024.*`, `DJIG0025.*`) is **not committed** to the repo — `.gitignore` excludes `samples/*.mp4`, `samples/*.osd`, `samples/*.srt`. Metadata lives in `samples/manifest.json`; raw files are distributed via GitHub release assets.
 
 ## Code Style
 
