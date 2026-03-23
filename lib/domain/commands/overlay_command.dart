@@ -7,4 +7,6 @@ abstract class OverlayCommand {
     AppConfiguration config,
     String outputPath,
   );
+
+  void cancel() {}
 }

@@ -1,7 +1,15 @@
 import 'package:file/file.dart';
 import 'package:file/local.dart';
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
+
 import 'package:fpv_overlay_app/domain/models/overlay_task.dart';
+
+const _uuid = Uuid();
+
+/// Regex to split a DJI-style clip stem into an alpha prefix and numeric suffix.
+/// e.g. "DJIG0078" → prefix "DJIG", number 78
+final _segmentStemRe = RegExp(r'^(.*?)(\d+)$');
 
 class EngineService {
   final FileSystem _fileSystem;
@@ -55,57 +63,104 @@ class EngineService {
 
     final tasks = <OverlayTask>[];
     final processedStems = <String>{};
+    final processedOsdStems = <String>{};
 
     for (final stem in videos.keys) {
       processedStems.add(stem);
-      if (osdFiles.containsKey(stem)) {
-        tasks.add(OverlayTask(
-          id: DateTime.now().microsecondsSinceEpoch.toString() + stem,
-          videoPath: videos[stem]!,
-          overlayPath: osdFiles[stem]!,
-          type: OverlayType.osd,
-          status: TaskStatus.pending,
-        ));
-      } else if (srtFiles.containsKey(stem)) {
-        tasks.add(OverlayTask(
-          id: DateTime.now().microsecondsSinceEpoch.toString() + stem,
-          videoPath: videos[stem]!,
-          overlayPath: srtFiles[stem]!,
-          type: OverlayType.srt,
-          status: TaskStatus.pending,
-        ));
+      final hasOsd = osdFiles.containsKey(stem);
+      final hasSrt = srtFiles.containsKey(stem);
+
+      // When this clip has no exact-match OSD, look for a preceding segment's
+      // OSD file. DJI cameras write a single .osd file for the first segment
+      // of a flight even when the recording spans multiple video clips.
+      // e.g. DJIG0077.osd covers DJIG0077.mp4 + DJIG0078.mp4 + …
+      final String? resolvedOsdPath =
+          hasOsd ? osdFiles[stem] : _findPrecedingOsd(stem, osdFiles);
+
+      if (resolvedOsdPath != null) {
+        processedOsdStems.add(p.basenameWithoutExtension(resolvedOsdPath));
+      }
+
+      if (resolvedOsdPath != null || hasSrt) {
+        tasks.add(
+          OverlayTask(
+            id: _uuid.v4(),
+            videoPath: videos[stem]!,
+            osdPath: resolvedOsdPath,
+            srtPath: hasSrt ? srtFiles[stem]! : null,
+            status: TaskStatus.pending,
+          ),
+        );
       } else {
-        // Orphan Video
-        tasks.add(OverlayTask(
-          id: DateTime.now().microsecondsSinceEpoch.toString() + stem,
-          videoPath: videos[stem]!,
-          status: TaskStatus.missingTelemetry,
-        ));
+        // Orphan video – waiting for telemetry to be linked.
+        tasks.add(
+          OverlayTask(
+            id: _uuid.v4(),
+            videoPath: videos[stem]!,
+            status: TaskStatus.missingTelemetry,
+          ),
+        );
       }
     }
 
-    // Check for orphan telemetry files
+    // Orphan telemetry files – waiting for a video to be linked.
     for (final stem in srtFiles.keys) {
       if (!processedStems.contains(stem)) {
-        tasks.add(OverlayTask(
-          id: DateTime.now().microsecondsSinceEpoch.toString() + stem,
-          overlayPath: srtFiles[stem]!,
-          type: OverlayType.srt,
-          status: TaskStatus.missingVideo,
-        ));
+        tasks.add(
+          OverlayTask(
+            id: _uuid.v4(),
+            srtPath: srtFiles[stem]!,
+            status: TaskStatus.missingVideo,
+          ),
+        );
       }
     }
     for (final stem in osdFiles.keys) {
-      if (!processedStems.contains(stem)) {
-        tasks.add(OverlayTask(
-          id: DateTime.now().microsecondsSinceEpoch.toString() + stem,
-          overlayPath: osdFiles[stem]!,
-          type: OverlayType.osd,
-          status: TaskStatus.missingVideo,
-        ));
+      if (!processedStems.contains(stem) && !processedOsdStems.contains(stem)) {
+        tasks.add(
+          OverlayTask(
+            id: _uuid.v4(),
+            osdPath: osdFiles[stem]!,
+            status: TaskStatus.missingVideo,
+          ),
+        );
       }
     }
 
     return tasks;
+  }
+
+  /// Finds the nearest preceding OSD file for a video stem that has no
+  /// exact-match OSD (e.g. DJIG0078 → falls back to DJIG0077.osd).
+  ///
+  /// Strategy:
+  ///   1. Parse [videoStem] into an alpha prefix + numeric index.
+  ///   2. From [osdFiles], keep only OSD stems with the same prefix.
+  ///   3. Return the path for the largest numeric index that is < [videoStem]'s index.
+  String? _findPrecedingOsd(String videoStem, Map<String, String> osdFiles) {
+    if (osdFiles.isEmpty) return null;
+
+    final videoMatch = _segmentStemRe.firstMatch(videoStem);
+    if (videoMatch == null) return null;
+
+    final videoPrefix = videoMatch.group(1)!;
+    final videoIndex = int.parse(videoMatch.group(2)!);
+
+    String? bestStem;
+    int bestIndex = -1;
+
+    for (final osdStem in osdFiles.keys) {
+      final osdMatch = _segmentStemRe.firstMatch(osdStem);
+      if (osdMatch == null) continue;
+      if (osdMatch.group(1) != videoPrefix) continue;
+
+      final osdIndex = int.parse(osdMatch.group(2)!);
+      if (osdIndex < videoIndex && osdIndex > bestIndex) {
+        bestIndex = osdIndex;
+        bestStem = osdStem;
+      }
+    }
+
+    return bestStem != null ? osdFiles[bestStem] : null;
   }
 }

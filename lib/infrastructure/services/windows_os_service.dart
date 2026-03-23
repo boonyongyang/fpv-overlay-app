@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:local_notifier/local_notifier.dart';
 import 'package:windows_taskbar/windows_taskbar.dart';
+
 import 'package:fpv_overlay_app/domain/services/os_service.dart';
 
 class WindowsOsService implements OsService {
@@ -12,17 +12,13 @@ class WindowsOsService implements OsService {
 
   @override
   void updateDockProgress(double progress) {
-    if (Platform.isWindows) {
-      WindowsTaskbar.setProgressMode(TaskbarProgressMode.normal);
-      WindowsTaskbar.setProgress((progress * 100).toInt(), 100);
-    }
+    WindowsTaskbar.setProgressMode(TaskbarProgressMode.normal);
+    WindowsTaskbar.setProgress((progress * 100).toInt(), 100);
   }
 
   @override
   void resetDockProgress() {
-    if (Platform.isWindows) {
-      WindowsTaskbar.setProgressMode(TaskbarProgressMode.noProgress);
-    }
+    WindowsTaskbar.setProgressMode(TaskbarProgressMode.noProgress);
   }
 
   @override
@@ -38,4 +34,7 @@ class WindowsOsService implements OsService {
     );
     await notification.show();
   }
+
+  @override
+  Future<double?> getCpuUsage() async => null;
 }

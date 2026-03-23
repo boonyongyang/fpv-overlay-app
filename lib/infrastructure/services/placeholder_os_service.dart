@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:fpv_overlay_app/domain/services/os_service.dart';
 
 class PlaceholderOsService implements OsService {
@@ -16,6 +18,9 @@ class PlaceholderOsService implements OsService {
     required String body,
     bool silent = false,
   }) async {
-    print('Notification: $title - $body');
+    debugPrint('Notification: $title – $body');
   }
+
+  @override
+  Future<double?> getCpuUsage() async => null;
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fpv_overlay_app/core/utils/platform_utils.dart';
 import 'package:fpv_overlay_app/presentation/widgets/fpv_logo.dart';
 
 class HelpPage extends StatelessWidget {
@@ -51,7 +52,7 @@ class HelpPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 48),
-          _HelpSection(
+          const _HelpSection(
             title: 'Getting Started',
             items: [
               _HelpItem(
@@ -72,7 +73,7 @@ class HelpPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 32),
-          _HelpSection(
+          const _HelpSection(
             title: 'Supported File Types',
             items: [
               _HelpItem(
@@ -93,7 +94,7 @@ class HelpPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 32),
-          _HelpSection(
+          const _HelpSection(
             title: 'Compatible Hardware',
             items: [
               _HelpItem(
@@ -119,7 +120,7 @@ class HelpPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 32),
-          _HelpSection(
+          const _HelpSection(
             title: 'Community & Branding',
             items: [
               _HelpItem(
@@ -130,7 +131,7 @@ class HelpPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 32),
-          _HelpSection(
+          const _HelpSection(
             title: 'Technical Details',
             items: [
               _HelpItem(
@@ -146,13 +147,39 @@ class HelpPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 32),
-          _HelpSection(
+          const _HelpSection(
             title: 'Troubleshooting',
             items: [
               _HelpItem(
                 question: 'The processing fails immediately.',
                 answer:
-                    'Check the "System Info" tab to ensure FFmpeg and the Overlay Engine are correctly "BUNDLED" or found on your system path.',
+                    'First check System Info to see which FFmpeg and Python '
+                    'paths the app resolved. Release builds can bundle those '
+                    'runtimes, but source builds rely on system installs. If '
+                    'the paths look wrong, reinstall the app or update your '
+                    'local FFmpeg/Python setup.',
+              ),
+              _HelpItem(
+                question: 'OSD rendering fails with a "font" error.',
+                answer:
+                    'All 28 standard OSD font sheets are bundled inside the app, so this '
+                    'should not normally happen. If it does, check that the app was not '
+                    'moved out of the Applications folder (macOS) or that no files were '
+                    'deleted from the install directory.\n\n'
+                    'If you want to use custom fonts from O3_OverlayTool, open '
+                    'System Info → Application Preferences and set the '
+                    'O3_OverlayTool Directory to the folder containing your font PNGs.',
+              ),
+              _HelpItem(
+                question:
+                    'OSD rendering fails with a "dependency" or "module" error.',
+                answer:
+                    'The app needs Python with numpy, pillow, and pandas available. '
+                    'Some releases may bundle that runtime; source builds resolve it '
+                    'from your machine.\n\n'
+                    'If you hit a module error, use "Copy Report" in System Info to see '
+                    'which Python interpreter was selected, then install the packages '
+                    'for that interpreter.',
               ),
               _HelpItem(
                 question: 'The overlay is out of sync.',
@@ -162,7 +189,11 @@ class HelpPage extends StatelessWidget {
               _HelpItem(
                 question: 'Why are some files not appearing in the queue?',
                 answer:
-                    'The engine automatically filters out empty (0-byte) files. Additionally, the app requires both a video (.mp4/.mov) and a matching telemetry file (.srt/.osd) with the same filename to create a task.',
+                    'The engine automatically filters out empty (0-byte) files. '
+                    'Additionally, the app requires both a video (.mp4/.mov) and '
+                    'a matching telemetry file (.srt/.osd) with the same filename '
+                    'to create a task. Folder scans are currently top-level only, '
+                    'so nested subfolders are ignored.',
               ),
             ],
           ),
@@ -177,8 +208,11 @@ class HelpPage extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.code_rounded,
-                    color: theme.colorScheme.primary, size: 32),
+                Icon(
+                  Icons.code_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 32,
+                ),
                 const SizedBox(width: 20),
                 Expanded(
                   child: Column(
@@ -198,9 +232,9 @@ class HelpPage extends StatelessWidget {
                 ),
                 const SizedBox(width: 20),
                 OutlinedButton(
-                  onPressed: () {
-                    // In a real app we'd use url_launcher
-                  },
+                  onPressed: () => PlatformUtils.openUrl(
+                    'https://github.com/YangBo17/fpv-overlay-app',
+                  ),
                   child: const Text('View on GitHub'),
                 ),
               ],

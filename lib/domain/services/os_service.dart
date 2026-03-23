@@ -7,4 +7,8 @@ abstract class OsService {
     required String body,
     bool silent = false,
   });
+
+  /// Returns the current total CPU usage as a percentage, or null if
+  /// unsupported on the current platform.
+  Future<double?> getCpuUsage();
 }

@@ -5,6 +5,7 @@ class StorageService {
   static const String _lastInputKey = 'last_input_dir';
   static const String _lastOutputKey = 'last_output_dir';
   static const String _defaultOutputKey = 'default_output_dir';
+  static const String _analyticsEnabledKey = 'analytics_enabled';
 
   Future<AppConfiguration> loadConfig() async {
     final prefs = await SharedPreferences.getInstance();
@@ -12,6 +13,7 @@ class StorageService {
       lastUsedInputDirectory: prefs.getString(_lastInputKey),
       lastUsedOutputDirectory: prefs.getString(_lastOutputKey),
       defaultOutputDirectory: prefs.getString(_defaultOutputKey),
+      analyticsEnabled: prefs.getBool(_analyticsEnabledKey) ?? true,
     );
   }
 
@@ -29,6 +31,7 @@ class StorageService {
     } else {
       await prefs.remove(_defaultOutputKey);
     }
+    await prefs.setBool(_analyticsEnabledKey, config.analyticsEnabled);
   }
 
   Future<void> clearAll() async {

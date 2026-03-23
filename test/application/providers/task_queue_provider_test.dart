@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:fpv_overlay_app/application/providers/task_queue_provider.dart';
 import 'package:fpv_overlay_app/domain/models/overlay_task.dart';
+import 'package:fpv_overlay_app/domain/services/telemetry.dart';
 import 'package:fpv_overlay_app/infrastructure/services/engine_service.dart';
 import 'package:fpv_overlay_app/infrastructure/services/command_runner_service.dart';
 import 'package:fpv_overlay_app/domain/services/os_service.dart';
@@ -13,6 +14,9 @@ class MockCommandRunnerService extends Mock implements CommandRunnerService {}
 class MockOsService extends Mock implements OsService {}
 
 void main() {
+  // Disable telemetry so Firebase is never initialised during unit tests.
+  setUpAll(() => Telemetry.setEnabled(false));
+  tearDownAll(() => Telemetry.setEnabled(true));
   late TaskQueueProvider provider;
   late MockEngineService mockEngine;
   late MockCommandRunnerService mockRunner;
@@ -40,7 +44,6 @@ void main() {
       provider.addManualTask(
         videoPath: '/path/video.mp4',
         overlayPath: '/path/audio.srt',
-        type: OverlayType.srt,
       );
 
       expect(provider.tasks.length, 1);
@@ -67,8 +70,7 @@ void main() {
       // 2. Add the matching telemetry later
       final incomingSrt = OverlayTask(
         id: '2',
-        overlayPath: '/data/flight01.srt',
-        type: OverlayType.srt,
+        srtPath: '/data/flight01.srt',
         status: TaskStatus.missingVideo,
       );
 
@@ -80,16 +82,84 @@ void main() {
       // Should have merged into the existing task
       expect(provider.tasks.length, 1);
       expect(provider.tasks.first.status, TaskStatus.pending);
-      expect(provider.tasks.first.overlayPath, '/data/flight01.srt');
+      expect(provider.tasks.first.srtPath, '/data/flight01.srt');
       expect(result.addedCount, 1);
       expect(result.partialCount, 0);
+    });
+
+    test('Should auto-link a preceding OSD for a later split segment',
+        () async {
+      when(() => mockEngine.findPairsFromFiles(any())).thenAnswer((invocation) {
+        final paths = invocation.positionalArguments.first as List<String>;
+        if (paths.contains('/data/DJIG0078.mp4')) {
+          return Future.value([
+            OverlayTask(
+              id: '1',
+              videoPath: '/data/DJIG0078.mp4',
+              status: TaskStatus.missingTelemetry,
+            ),
+          ]);
+        }
+        if (paths.contains('/data/DJIG0077.osd')) {
+          return Future.value([
+            OverlayTask(
+              id: '2',
+              osdPath: '/data/DJIG0077.osd',
+              status: TaskStatus.missingVideo,
+            ),
+          ]);
+        }
+        return Future.value(<OverlayTask>[]);
+      });
+
+      await provider.addTasksFromFiles(['/data/DJIG0078.mp4']);
+      final result = await provider.addTasksFromFiles(['/data/DJIG0077.osd']);
+
+      expect(provider.tasks.length, 1);
+      expect(provider.tasks.first.videoPath, '/data/DJIG0078.mp4');
+      expect(provider.tasks.first.osdPath, '/data/DJIG0077.osd');
+      expect(provider.tasks.first.status, TaskStatus.pending);
+      expect(result.addedCount, 1);
+      expect(result.partialCount, 0);
+    });
+
+    test('Should not auto-link a preceding OSD from a different directory',
+        () async {
+      when(() => mockEngine.findPairsFromFiles(any())).thenAnswer((invocation) {
+        final paths = invocation.positionalArguments.first as List<String>;
+        if (paths.contains('/data-a/DJIG0078.mp4')) {
+          return Future.value([
+            OverlayTask(
+              id: '1',
+              videoPath: '/data-a/DJIG0078.mp4',
+              status: TaskStatus.missingTelemetry,
+            ),
+          ]);
+        }
+        if (paths.contains('/data-b/DJIG0077.osd')) {
+          return Future.value([
+            OverlayTask(
+              id: '2',
+              osdPath: '/data-b/DJIG0077.osd',
+              status: TaskStatus.missingVideo,
+            ),
+          ]);
+        }
+        return Future.value(<OverlayTask>[]);
+      });
+
+      await provider.addTasksFromFiles(['/data-a/DJIG0078.mp4']);
+      await provider.addTasksFromFiles(['/data-b/DJIG0077.osd']);
+
+      expect(provider.tasks.length, 2);
+      expect(provider.tasks.first.status, TaskStatus.missingTelemetry);
+      expect(provider.tasks.first.osdPath, isNull);
     });
 
     test('Should remove tasks correctly', () {
       provider.addManualTask(
         videoPath: 'v',
-        overlayPath: 'o',
-        type: OverlayType.srt,
+        overlayPath: 'o.srt',
       );
       final id = provider.tasks.first.id;
 

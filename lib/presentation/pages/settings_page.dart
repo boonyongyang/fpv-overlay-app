@@ -1,12 +1,15 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'dart:io';
 
-import 'package:fpv_overlay_app/core/utils/platform_utils.dart';
 import 'package:fpv_overlay_app/application/providers/settings_provider.dart';
-import 'package:fpv_overlay_app/infrastructure/services/picker_service.dart';
 import 'package:fpv_overlay_app/core/utils/path_resolver.dart';
+import 'package:fpv_overlay_app/core/utils/platform_utils.dart';
+import 'package:fpv_overlay_app/domain/services/telemetry.dart';
+import 'package:fpv_overlay_app/infrastructure/services/picker_service.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -67,19 +70,56 @@ class SettingsPage extends StatelessWidget {
                           settingsProvider.config.defaultOutputDirectory,
                     );
                     if (dir != null) {
-                      settingsProvider.updateConfig(
-                          defaultOutputDirectory: dir);
+                      unawaited(
+                        settingsProvider.updateConfig(
+                          defaultOutputDirectory: dir,
+                        ),
+                      );
+                      Telemetry.changedSetting('default_output_dir', dir);
                     }
                   },
                   icon: const Icon(Icons.folder_open_rounded, size: 16),
                   label: Text(
-                      settingsProvider.config.defaultOutputDirectory == null
-                          ? 'Set Default'
-                          : 'Change'),
+                    settingsProvider.config.defaultOutputDirectory == null
+                        ? 'Set Default'
+                        : 'Change',
+                  ),
                 ),
                 onClear: settingsProvider.config.defaultOutputDirectory != null
                     ? () => settingsProvider.updateConfig(
-                        defaultOutputDirectory: null)
+                          defaultOutputDirectory: null,
+                        )
+                    : null,
+              ),
+              _SettingTile(
+                title: 'O3_OverlayTool Directory (Optional)',
+                subtitle: settingsProvider.config.o3OverlayToolPath ??
+                    'Not set – fonts are bundled, no download needed',
+                action: OutlinedButton.icon(
+                  onPressed: () async {
+                    final dir = await pickerService.pickDirectory(
+                      initialDirectory:
+                          settingsProvider.config.o3OverlayToolPath,
+                    );
+                    if (dir != null) {
+                      unawaited(
+                        settingsProvider.updateConfig(
+                          o3OverlayToolPath: dir,
+                        ),
+                      );
+                      Telemetry.changedSetting('o3_overlay_tool_path', dir);
+                    }
+                  },
+                  icon: const Icon(Icons.folder_open_rounded, size: 16),
+                  label: Text(
+                    settingsProvider.config.o3OverlayToolPath == null
+                        ? 'Browse'
+                        : 'Change',
+                  ),
+                ),
+                onClear: settingsProvider.config.o3OverlayToolPath != null
+                    ? () =>
+                        settingsProvider.updateConfig(o3OverlayToolPath: null)
                     : null,
               ),
             ],
@@ -87,7 +127,18 @@ class SettingsPage extends StatelessWidget {
 
           const SizedBox(height: 32),
 
-          // 3. Quick Actions Section (New)
+          // 3. Privacy Section – analytics opt-out
+          _Section(
+            title: 'Privacy',
+            icon: Icons.privacy_tip_rounded,
+            children: [
+              _AnalyticsToggleTile(settingsProvider: settingsProvider),
+            ],
+          ),
+
+          const SizedBox(height: 32),
+
+          // 4. Quick Actions Section (New)
           _Section(
             title: 'Quick Actions',
             icon: Icons.bolt_rounded,
@@ -100,6 +151,7 @@ class SettingsPage extends StatelessWidget {
                     icon: Icons.folder_shared_rounded,
                     label: 'Open Output',
                     onTap: () {
+                      Telemetry.tappedButton('open_output_dir');
                       final path =
                           settingsProvider.config.defaultOutputDirectory ??
                               settingsProvider.config.lastUsedOutputDirectory;
@@ -112,6 +164,7 @@ class SettingsPage extends StatelessWidget {
                     icon: Icons.content_copy_rounded,
                     label: 'Copy Report',
                     onTap: () {
+                      Telemetry.tappedButton('copy_system_report');
                       final report = '''
 FPV Overlay Toolbox System Report
 ---------------------------------
@@ -140,7 +193,8 @@ OS: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
                         builder: (context) => AlertDialog(
                           title: const Text('Reset Settings?'),
                           content: const Text(
-                              'This will clear all saved paths and preferences. The app will restart with defaults.'),
+                            'This will clear all saved paths and preferences. The app will restart with defaults.',
+                          ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(context),
@@ -148,11 +202,14 @@ OS: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
                             ),
                             TextButton(
                               onPressed: () {
+                                Telemetry.tappedButton('reset_app');
                                 settingsProvider.resetConfig();
                                 Navigator.pop(context);
                               },
-                              child: const Text('Reset',
-                                  style: TextStyle(color: Colors.red)),
+                              child: const Text(
+                                'Reset',
+                                style: TextStyle(color: Colors.red),
+                              ),
                             ),
                           ],
                         ),
@@ -164,35 +221,57 @@ OS: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
             ],
           ),
 
-          const SizedBox(height: 32),
-
-          // 4. Core Engine Section
-          _Section(
-            title: 'Core Engine (Auto-Configured)',
-            icon: Icons.settings_applications_rounded,
-            children: [
-              _DependencyStatus(
-                title: 'FFmpeg Binary',
-                description: 'Required for SRT overlays and video encoding.',
-                resolvedPath: PathResolver.ffmpegPath,
-                isBundled: PathResolver.ffmpegPath != 'ffmpeg',
-              ),
-              _DependencyStatus(
-                title: 'Python 3 Interpreter',
-                description: 'Used to run the OSD rendering scripts.',
-                resolvedPath: PathResolver.pythonPath,
-                isBundled: PathResolver.pythonPath != 'python3',
-              ),
-              _DependencyStatus(
-                title: 'O3_OverlayTool Source',
-                description: 'The Python scripts for rendering gauges.',
-                resolvedPath: PathResolver.o3OverlayToolPath ?? 'Not Found',
-                isBundled: PathResolver.o3OverlayToolPath != null,
-                isError: PathResolver.o3OverlayToolPath == null,
-              ),
-            ],
-          ),
           const SizedBox(height: 64),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnalyticsToggleTile extends StatelessWidget {
+  final SettingsProvider settingsProvider;
+  const _AnalyticsToggleTile({required this.settingsProvider});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final enabled = settingsProvider.config.analyticsEnabled;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border:
+            Border.all(color: theme.colorScheme.outlineVariant.withAlpha(50)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Usage Analytics & Crash Reports',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Send anonymous crash reports and usage data to help improve the app.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Switch(
+            value: enabled,
+            onChanged: (value) {
+              settingsProvider.updateAnalyticsEnabled(value);
+              Telemetry.changedSetting('analytics_enabled', value);
+            },
+          ),
         ],
       ),
     );
@@ -204,8 +283,11 @@ class _Section extends StatelessWidget {
   final IconData icon;
   final List<Widget> children;
 
-  const _Section(
-      {required this.title, required this.icon, required this.children});
+  const _Section({
+    required this.title,
+    required this.icon,
+    required this.children,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -216,8 +298,11 @@ class _Section extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon,
-                  size: 20, color: Theme.of(context).colorScheme.primary),
+              Icon(
+                icon,
+                size: 20,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(width: 12),
               Text(
                 title,
@@ -266,8 +351,10 @@ class _SettingTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
@@ -332,11 +419,13 @@ class _QuickActionCard extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon,
-                  size: 18,
-                  color: isDestructive
-                      ? theme.colorScheme.error
-                      : theme.colorScheme.primary),
+              Icon(
+                icon,
+                size: 18,
+                color: isDestructive
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.primary,
+              ),
               const SizedBox(width: 10),
               Text(
                 label,
@@ -351,95 +440,6 @@ class _QuickActionCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _DependencyStatus extends StatelessWidget {
-  final String title;
-  final String description;
-  final String resolvedPath;
-  final bool isBundled;
-  final bool isError;
-
-  const _DependencyStatus({
-    required this.title,
-    required this.description,
-    required this.resolvedPath,
-    required this.isBundled,
-    this.isError = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow.withAlpha(150),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(title,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                const Spacer(),
-                if (isBundled && !isError)
-                  const _Badge(label: 'BUNDLED', color: Colors.green)
-                else if (isError)
-                  const _Badge(label: 'MISSING', color: Colors.red)
-                else
-                  const _Badge(label: 'SYSTEM', color: Colors.orange),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(description,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                )),
-            const SizedBox(height: 12),
-            Text(
-              resolvedPath,
-              style: TextStyle(
-                fontFamily: 'SF Mono',
-                fontSize: 10,
-                color:
-                    isError ? Colors.red : theme.colorScheme.onSurfaceVariant,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _Badge({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withAlpha(30),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withAlpha(80)),
-      ),
-      child: Text(
-        label,
-        style:
-            TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.bold),
       ),
     );
   }

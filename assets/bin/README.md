@@ -1,26 +1,27 @@
-# Bundled Dependencies
+# Overlay Runtime Assets
 
-To make the **FPV Overlay Toolbox** a standalone macOS app, drop the following binaries and folders inside this directory:
+This directory contains the Python overlay scripts and font assets used by the desktop app.
 
-### 1. FFmpeg
-- Download a static macOS binary for FFmpeg (`ffmpeg`).
-- Ensure it's marked as executable (`chmod +x ffmpeg`)
-- Place it here: `assets/bin/ffmpeg`
+## Contents
 
-### 2. Python Environment
-- Place a standalone Python interpreter or binary here:
-- `assets/bin/python3`
-
-### 3. O3_OverlayTool
-- Clone or copy the `O3_OverlayTool` repository here.
-- It should look like this: `assets/bin/O3_OverlayTool/VideoMaker.py`
-
----
+| Item | Purpose |
+|---|---|
+| `osd_overlay.py` | Two-pass OSD HD rendering compositor |
+| `srt_overlay.py` | SRT subtitle overlay script |
+| `OsdFileReader.py` | Binary OSD file parser (imported by `osd_overlay.py`) |
+| `fonts/` | 28 OSD font sprite sheets (BetaFlight, INAV, DJI OG) |
+| `ffmpeg`, `ffprobe` | Bundled into the macOS release app under `Contents/Resources/runtime/` |
 
 ## How it works
 
-When the app runs, it will use `PathResolver` to check for these files.
-- **Development**: It checks the root `assets/bin` folder.
-- **Production (macOS app)**: To bundle these into the `.app`, you should add a build phase script in Xcode to copy `assets/bin/` into the `Contents/Resources/bin` directory of the app bundle, or package it inside the flutter assets (though executing binaries from flutter assets requires copying them to temp directories first).
+`PathResolver` in `lib/core/utils/path_resolver.dart` locates these files at runtime:
 
-Because this app uses these internal paths, the user no longer needs to configure any paths manually. If these files are missing, the app will gracefully fall back to checking the system `PATH` (e.g., `ffmpeg` or `python3`).
+- **Production (macOS .app):** Resolves to Flutter's app-bundle asset path under `App.framework/.../flutter_assets/assets/bin/`.
+- **Production (Windows .exe):** Resolves to `data/flutter_assets/assets/bin/` next to the executable.
+- **Development (`flutter run`):** Falls back to this source-tree directory (`assets/bin/`). FFmpeg and Python are resolved from bundled binaries when present, otherwise from the system PATH / Homebrew.
+
+## Build packaging
+
+The scripts and font sheets committed here are bundled automatically via Flutter's asset pipeline.
+
+The repository does not commit third-party runtime binaries, but the macOS release packaging flow now downloads static `ffmpeg`/`ffprobe` archives and freezes the Python overlays into standalone executables before building the DMG.

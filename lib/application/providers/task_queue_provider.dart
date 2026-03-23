@@ -6,9 +6,16 @@ import 'package:path/path.dart' as p;
 import 'package:fpv_overlay_app/domain/models/app_configuration.dart';
 import 'package:fpv_overlay_app/domain/models/overlay_task.dart';
 import 'package:fpv_overlay_app/domain/models/task_addition_result.dart';
+import 'package:fpv_overlay_app/domain/services/telemetry.dart';
+import 'package:fpv_overlay_app/domain/services/task_failure_parser.dart';
+import 'package:uuid/uuid.dart';
+
 import 'package:fpv_overlay_app/infrastructure/services/engine_service.dart';
 import 'package:fpv_overlay_app/infrastructure/services/command_runner_service.dart';
+import 'package:fpv_overlay_app/infrastructure/services/firebase/crashlytics_service.dart';
 import 'package:fpv_overlay_app/domain/services/os_service.dart';
+
+final _segmentStemRe = RegExp(r'^(.*?)(\d+)$');
 
 class TaskQueueProvider extends ChangeNotifier {
   final EngineService _engineService;
@@ -17,6 +24,7 @@ class TaskQueueProvider extends ChangeNotifier {
 
   final List<OverlayTask> _tasks = [];
   bool _isProcessing = false;
+  bool _cancelRequested = false;
 
   TaskQueueProvider({
     required EngineService engineService,
@@ -28,23 +36,26 @@ class TaskQueueProvider extends ChangeNotifier {
 
   List<OverlayTask> get tasks => List.unmodifiable(_tasks);
   bool get isProcessing => _isProcessing;
+  bool get isCancelling => _cancelRequested;
 
   void addTask(OverlayTask task) {
     _tasks.add(task);
     _updateDockState();
     notifyListeners();
+    Telemetry.taskAdded(task);
+    _updateCrashlyticsKeys();
   }
 
   void addManualTask({
     required String videoPath,
     required String overlayPath,
-    required OverlayType type,
   }) {
+    final ext = p.extension(overlayPath).toLowerCase();
     final task = OverlayTask(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: const Uuid().v4(),
       videoPath: videoPath,
-      overlayPath: overlayPath,
-      type: type,
+      osdPath: ext == '.osd' ? overlayPath : null,
+      srtPath: ext == '.srt' ? overlayPath : null,
     );
     addTask(task);
   }
@@ -68,48 +79,64 @@ class TaskQueueProvider extends ChangeNotifier {
       final newStem = newTask.stem;
       bool handled = false;
 
-      // Try to merge with existing tasks with the same stem
+      // Try to merge with an existing task that shares the same video stem.
       for (final existing in _tasks) {
-        if (existing.stem == newStem) {
-          // If existing is already pending/completed, skip incoming subset
-          if (existing.status == TaskStatus.pending ||
-              existing.status == TaskStatus.processing ||
-              existing.status == TaskStatus.completed) {
-            duplicateCount++;
-            handled = true;
-            break;
-          }
+        if (existing.stem != newStem) continue;
 
-          // Case 0: Exact same file paths already in an incomplete task
-          if ((existing.videoPath == newTask.videoPath &&
-                  newTask.videoPath != null) ||
-              (existing.overlayPath == newTask.overlayPath &&
-                  newTask.overlayPath != null)) {
-            duplicateCount++;
-            handled = true;
-            break;
+        // Active or finished task: absorb any new overlay type it is missing
+        // (e.g. user later drops an SRT for a video that already has OSD queued).
+        if (existing.status == TaskStatus.pending ||
+            existing.status == TaskStatus.processing ||
+            existing.status == TaskStatus.completed) {
+          bool merged = false;
+          if (existing.osdPath == null && newTask.osdPath != null) {
+            existing.osdPath = newTask.osdPath;
+            merged = true;
           }
+          if (existing.srtPath == null && newTask.srtPath != null) {
+            existing.srtPath = newTask.srtPath;
+            merged = true;
+          }
+          if (merged) {
+            addedCount++;
+          } else {
+            duplicateCount++;
+          }
+          handled = true;
+          break;
+        }
 
-          // Case 1: Merge missing telemetry with incoming telemetry
-          if (existing.status == TaskStatus.missingTelemetry &&
-              newTask.overlayPath != null) {
-            existing.overlayPath = newTask.overlayPath;
-            existing.type = newTask.type;
+        // Merge: existing has video but no telemetry, new task supplies overlay(s).
+        if (existing.status == TaskStatus.missingTelemetry) {
+          bool gotTelemetry = false;
+          if (newTask.osdPath != null) {
+            existing.osdPath = newTask.osdPath;
+            gotTelemetry = true;
+          }
+          if (newTask.srtPath != null) {
+            existing.srtPath = newTask.srtPath;
+            gotTelemetry = true;
+          }
+          if (gotTelemetry) {
             existing.status = TaskStatus.pending;
             addedCount++;
-            handled = true;
-            break;
+          } else {
+            duplicateCount++;
           }
+          handled = true;
+          break;
+        }
 
-          // Case 2: Merge missing video with incoming video
-          if (existing.status == TaskStatus.missingVideo &&
-              newTask.videoPath != null) {
-            existing.videoPath = newTask.videoPath;
-            existing.status = TaskStatus.pending;
-            addedCount++;
-            handled = true;
-            break;
-          }
+        // Merge: existing has telemetry but no video, new task supplies video.
+        if (existing.status == TaskStatus.missingVideo &&
+            newTask.videoPath != null) {
+          existing.videoPath = newTask.videoPath;
+          if (newTask.osdPath != null) existing.osdPath = newTask.osdPath;
+          if (newTask.srtPath != null) existing.srtPath = newTask.srtPath;
+          existing.status = TaskStatus.pending;
+          addedCount++;
+          handled = true;
+          break;
         }
       }
 
@@ -121,6 +148,14 @@ class TaskQueueProvider extends ChangeNotifier {
           partialCount++;
         }
       }
+    }
+
+    final fallbackResolvedCount = _applyPrecedingOsdFallbacks();
+    if (fallbackResolvedCount > 0) {
+      addedCount += fallbackResolvedCount;
+      partialCount = partialCount > fallbackResolvedCount
+          ? partialCount - fallbackResolvedCount
+          : 0;
     }
 
     if (addedCount > 0 || partialCount > 0 || incoming.isNotEmpty) {
@@ -135,39 +170,57 @@ class TaskQueueProvider extends ChangeNotifier {
     );
   }
 
-  void updateTaskFiles(String taskId,
-      {String? videoPath, String? overlayPath}) {
+  void updateTaskFiles(
+    String taskId, {
+    String? videoPath,
+    String? overlayPath,
+  }) {
     final index = _tasks.indexWhere((t) => t.id == taskId);
     if (index == -1) return;
 
     final task = _tasks[index];
     if (videoPath != null) task.videoPath = videoPath;
     if (overlayPath != null) {
-      task.overlayPath = overlayPath;
       final ext = p.extension(overlayPath).toLowerCase();
-      if (ext == '.srt') {
-        task.type = OverlayType.srt;
-      } else if (ext == '.osd') {
-        task.type = OverlayType.osd;
+      if (ext == '.osd') {
+        task.osdPath = overlayPath;
+      } else if (ext == '.srt') {
+        task.srtPath = overlayPath;
       }
     }
 
-    // Auto-resolve status if both paths are now present
-    if (task.videoPath != null && task.overlayPath != null) {
+    // Auto-resolve status when video and at least one overlay are present.
+    if (task.videoPath != null &&
+        (task.osdPath != null || task.srtPath != null)) {
       task.status = TaskStatus.pending;
     }
 
+    _applyPrecedingOsdFallbacks();
+    _updateDockState();
     notifyListeners();
   }
 
   void removeTask(String id) {
+    final removed =
+        _tasks.where((t) => t.id == id && t.status != TaskStatus.processing);
+    if (removed.isNotEmpty) Telemetry.taskRemoved(id);
     _tasks.removeWhere((t) => t.id == id && t.status != TaskStatus.processing);
     _updateDockState();
     notifyListeners();
   }
 
+  void cancelQueue() {
+    if (!_isProcessing || _cancelRequested) return;
+    _cancelRequested = true;
+    _commandRunnerService.cancelCurrentTask();
+    notifyListeners();
+  }
+
   void clearCompleted() {
-    _tasks.removeWhere((t) => t.status == TaskStatus.completed);
+    _tasks.removeWhere(
+      (t) =>
+          t.status == TaskStatus.completed || t.status == TaskStatus.cancelled,
+    );
     _updateDockState();
     notifyListeners();
   }
@@ -176,6 +229,12 @@ class TaskQueueProvider extends ChangeNotifier {
     _tasks.removeWhere((t) => t.status != TaskStatus.processing);
     _updateDockState();
     notifyListeners();
+  }
+
+  void _updateCrashlyticsKeys() {
+    final crashlytics = CrashlyticsService.instance;
+    unawaited(crashlytics.setCustomKey('platform', Platform.operatingSystem));
+    unawaited(crashlytics.setCustomKey('queue_length', _tasks.length));
   }
 
   void _updateDockState() {
@@ -190,21 +249,99 @@ class TaskQueueProvider extends ChangeNotifier {
     }
   }
 
-  Future<double?> _getCPUUsage() async {
-    try {
-      // macOS specific command to get total CPU usage %
-      final result = await Process.run('ps', ['-A', '-o', '%cpu']);
-      if (result.exitCode == 0) {
-        final lines = (result.stdout as String).split('\n');
-        double total = 0.0;
-        for (var line in lines.skip(1)) {
-          final val = double.tryParse(line.trim());
-          if (val != null) total += val;
+  int _applyPrecedingOsdFallbacks() {
+    final candidates = <_OsdCandidate>[];
+    for (final task in _tasks) {
+      final osdPath = task.osdPath;
+      if (osdPath == null || osdPath.isEmpty) continue;
+
+      final stem = p.basenameWithoutExtension(osdPath);
+      final match = _segmentStemRe.firstMatch(stem);
+      if (match == null) continue;
+
+      candidates.add(
+        _OsdCandidate(
+          path: osdPath,
+          directory: p.dirname(osdPath),
+          prefix: match.group(1)!,
+          index: int.parse(match.group(2)!),
+        ),
+      );
+    }
+
+    int resolvedCount = 0;
+    for (final task in _tasks) {
+      if (!_canAutoAttachOsd(task)) continue;
+
+      final videoPath = task.videoPath!;
+      final match =
+          _segmentStemRe.firstMatch(p.basenameWithoutExtension(videoPath));
+      if (match == null) continue;
+
+      final videoDirectory = p.dirname(videoPath);
+      final videoPrefix = match.group(1)!;
+      final videoIndex = int.parse(match.group(2)!);
+
+      _OsdCandidate? bestCandidate;
+      for (final candidate in candidates) {
+        if (candidate.directory != videoDirectory ||
+            candidate.prefix != videoPrefix) {
+          continue;
         }
-        return total;
+
+        final isBetterExactMatch = candidate.index == videoIndex;
+        final isBetterFallback = candidate.index < videoIndex &&
+            (bestCandidate == null || candidate.index > bestCandidate.index);
+
+        if (isBetterExactMatch || isBetterFallback) {
+          bestCandidate = candidate;
+        }
+
+        if (isBetterExactMatch) break;
       }
-    } catch (_) {}
-    return null;
+
+      if (bestCandidate == null) continue;
+
+      task.osdPath = bestCandidate.path;
+      if (task.videoPath != null &&
+          (task.osdPath != null || task.srtPath != null)) {
+        task.status = TaskStatus.pending;
+      }
+      resolvedCount++;
+    }
+
+    if (resolvedCount > 0) {
+      final consumedOsdPaths = _tasks
+          .where((t) => t.videoPath != null && t.osdPath != null)
+          .map((t) => t.osdPath!)
+          .toSet();
+      _tasks.removeWhere(
+        (task) =>
+            task.videoPath == null &&
+            task.status == TaskStatus.missingVideo &&
+            task.osdPath != null &&
+            task.srtPath == null &&
+            consumedOsdPaths.contains(task.osdPath),
+      );
+    }
+
+    return resolvedCount;
+  }
+
+  bool _canAutoAttachOsd(OverlayTask task) {
+    if (task.videoPath == null || task.osdPath != null) return false;
+
+    switch (task.status) {
+      case TaskStatus.pending:
+      case TaskStatus.failed:
+      case TaskStatus.missingTelemetry:
+        return true;
+      case TaskStatus.processing:
+      case TaskStatus.completed:
+      case TaskStatus.cancelled:
+      case TaskStatus.missingVideo:
+        return false;
+    }
   }
 
   String _getUniqueOutputPath(String directory, String filename) {
@@ -220,23 +357,104 @@ class TaskQueueProvider extends ChangeNotifier {
     return outputPath;
   }
 
+  // ── Progress parsing ────────────────────────────────────────────────────
+
+  static final _osdFrameRe = RegExp(r'OSD frame (\d+)/(\d+)');
+  static final _compositingRe = RegExp(r'Compositing:\s*(\d+)%');
+  static final _renderingRe = RegExp(r'Rendering:\s*(\d+)%');
+
+  /// Parses a log line and updates [task.progress] and [task.progressPhase].
+  ///
+  /// For OSD / combined tasks the budget is:
+  ///   Pass 1 (OSD frame rendering)  → 0 % – 70 %
+  ///   Pass 2 (FFmpeg compositing)   → 70 % – 100 %
+  ///
+  /// For SRT-only tasks the single FFmpeg render maps to 0 % – 100 %.
+  void _updateProgress(OverlayTask task, String line) {
+    // OSD frame rendering (Pass 1): "  OSD frame 601/3027 (9%)"
+    final osdMatch = _osdFrameRe.firstMatch(line);
+    if (osdMatch != null) {
+      final current = int.parse(osdMatch.group(1)!);
+      final total = int.parse(osdMatch.group(2)!);
+      if (total > 0) {
+        task.progress = (current / total) * 0.7;
+        task.progressPhase = 'Rendering OSD frames';
+      }
+      return;
+    }
+
+    // Pass 1 done
+    if (line.contains('Pass 1 complete')) {
+      task.progress = 0.7;
+      task.progressPhase = 'Compositing video';
+      return;
+    }
+
+    // Pass 2 compositing: "  Compositing: 85%"
+    final compMatch = _compositingRe.firstMatch(line);
+    if (compMatch != null) {
+      final pct = int.parse(compMatch.group(1)!);
+      task.progress = 0.7 + (pct / 100) * 0.3;
+      task.progressPhase = 'Compositing video';
+      return;
+    }
+
+    // SRT rendering: "  Rendering: 45%"
+    final renderMatch = _renderingRe.firstMatch(line);
+    if (renderMatch != null) {
+      final pct = int.parse(renderMatch.group(1)!);
+      task.progress = pct / 100;
+      task.progressPhase = 'Rendering SRT overlay';
+      return;
+    }
+
+    // Phase label updates (no progress value change)
+    if (line.contains('Starting OSD HD Rendering') ||
+        line.contains('Applying OSD HD Rendering')) {
+      task.progressPhase = 'Preparing OSD rendering';
+    } else if (line.contains('Pass 2:')) {
+      task.progressPhase = 'Compositing video';
+    } else if (line.contains('Rendering SRT HUD')) {
+      task.progressPhase = 'Rendering SRT overlay';
+    } else if (line.contains('Parsing SRT telemetry')) {
+      task.progressPhase = 'Parsing SRT telemetry';
+    }
+  }
+
   Future<void> startQueue(AppConfiguration config, String outputDir) async {
     if (_isProcessing) return;
     _isProcessing = true;
+    _cancelRequested = false;
     _updateDockState();
     notifyListeners();
 
+    final pendingCount = _tasks
+        .where(
+          (t) =>
+              t.status == TaskStatus.pending || t.status == TaskStatus.failed,
+        )
+        .length;
+    Telemetry.queueStarted(pendingCount);
+
     for (int i = 0; i < _tasks.length; i++) {
+      if (_cancelRequested) break;
+
       final task = _tasks[i];
       if (task.status == TaskStatus.pending ||
           task.status == TaskStatus.failed) {
         task.status = TaskStatus.processing;
         task.startTime = DateTime.now();
-        task.cpuUsageAtStart = await _getCPUUsage();
+        task.cpuUsageAtStart = await _osService.getCpuUsage();
+        if (task.cpuUsageAtStart != null) {
+          Telemetry.cpuUsage(task.cpuUsageAtStart!);
+        }
         task.logs.clear();
         task.errorMessage = null;
+        task.failure = null;
         task.progress = 0.0;
+        task.progressPhase = null;
         notifyListeners();
+        Telemetry.taskProcessing(task.id);
 
         try {
           final stem = p.basenameWithoutExtension(task.videoFileName);
@@ -248,49 +466,108 @@ class TaskQueueProvider extends ChangeNotifier {
 
           await for (final line in stream) {
             task.logs.add(line);
+            _updateProgress(task, line);
             if (line.contains('time=')) continue;
             notifyListeners();
           }
 
           task.endTime = DateTime.now();
 
-          if (task.logs.isNotEmpty &&
+          if (_cancelRequested) {
+            task.status = TaskStatus.cancelled;
+            task.progress = 0.0;
+            Telemetry.taskCancelled(task.id);
+          } else if (task.logs.isNotEmpty &&
               task.logs.last.contains('✅ Process completed successfully')) {
             task.status = TaskStatus.completed;
             task.progress = 1.0;
 
-            _osService.showNotification(
-              title: 'Overlay Finished',
-              body: '${task.videoFileName} is ready!',
-              silent: true,
+            final durationSec =
+                task.endTime!.difference(task.startTime!).inSeconds;
+            Telemetry.taskCompleted(task, durationSec);
+
+            unawaited(
+              _osService.showNotification(
+                title: 'Overlay Finished',
+                body: '${task.videoFileName} is ready!',
+                silent: true,
+              ),
             );
           } else {
             task.status = TaskStatus.failed;
-            task.errorMessage = 'Execution failed. Check logs.';
+            task.failure = TaskFailureParser.fromLogs(task.logs);
+            task.errorMessage = task.failure!.summary;
+            debugPrint(task.logs.join('\n'));
+            Telemetry.taskFailed(task.id, task.errorMessage!);
+            unawaited(
+              CrashlyticsService.instance
+                  .log('Task failed: ${task.id} – ${task.errorMessage}'),
+            );
           }
-        } catch (e) {
+        } catch (e, st) {
           task.endTime = DateTime.now();
           task.status = TaskStatus.failed;
-          task.errorMessage = e.toString();
+          task.failure =
+              TaskFailureParser.fromException(e, st, logs: task.logs);
+          task.errorMessage = task.failure!.summary;
+          Telemetry.taskFailed(task.id, task.errorMessage!);
+          unawaited(CrashlyticsService.instance.recordError(e, st));
         }
 
         _updateDockState();
         notifyListeners();
+        if (_cancelRequested) break;
       }
     }
 
     _isProcessing = false;
+    _cancelRequested = false;
 
     final completedCount =
         _tasks.where((t) => t.status == TaskStatus.completed).length;
+    final failedCount =
+        _tasks.where((t) => t.status == TaskStatus.failed).length;
+    final cancelledCount =
+        _tasks.where((t) => t.status == TaskStatus.cancelled).length;
+    final totalDurationSec =
+        _tasks.where((t) => t.startTime != null && t.endTime != null).fold<int>(
+              0,
+              (sum, t) => sum + t.endTime!.difference(t.startTime!).inSeconds,
+            );
+
+    Telemetry.queueCompleted(
+      totalTasks: pendingCount,
+      completedCount: completedCount,
+      failedCount: failedCount,
+      cancelledCount: cancelledCount,
+      totalDurationSec: totalDurationSec,
+    );
+
     if (completedCount > 0) {
-      _osService.showNotification(
-        title: 'Queue Completed',
-        body: 'Successfully processed $completedCount videos.',
+      unawaited(
+        _osService.showNotification(
+          title: 'Queue Completed',
+          body: 'Successfully processed $completedCount videos.',
+        ),
       );
     }
 
+    _updateCrashlyticsKeys();
     _updateDockState();
     notifyListeners();
   }
+}
+
+class _OsdCandidate {
+  final String path;
+  final String directory;
+  final String prefix;
+  final int index;
+
+  const _OsdCandidate({
+    required this.path,
+    required this.directory,
+    required this.prefix,
+    required this.index,
+  });
 }

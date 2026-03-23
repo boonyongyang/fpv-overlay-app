@@ -1,19 +1,23 @@
 #!/bin/bash
 
-# FPV Batch Overlay - Main Command
-# Process FPV drone videos with telemetry overlays (SRT text or OSD graphics)
-# Output always goes to input_folder/output
+# Legacy development helper for the batch-overlay-unified.py reference script.
+# Output always goes to input_folder/output.
 
 set -e
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_BACKEND="$SCRIPT_DIR/src/batch-overlay-unified.py"
+PYTHON_BACKEND="$SCRIPT_DIR/batch-overlay-unified.py"
+
+if [ ! -f "$PYTHON_BACKEND" ]; then
+    echo "❌ Missing backend script: $PYTHON_BACKEND"
+    exit 1
+fi
 
 # Show usage
 usage() {
     cat << 'EOF'
-FPV Batch Overlay - Process drone videos with telemetry overlays
+FPV Batch Overlay - Legacy development helper
 
 USAGE:
   fpv-overlay <input_dir>        Process videos (output → input_dir/output)
@@ -29,9 +33,6 @@ EXAMPLES:
 FORMATS:
   Input:  .mp4, .mov + .srt (fast) or .osd (beautiful)
   Output: Processed videos in input_dir/output/
-
-SETUP:
-  ~/fpv-overlay/setup.sh
 
 EOF
     exit 0

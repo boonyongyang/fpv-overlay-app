@@ -41,10 +41,42 @@ post_install do |installer|
     flutter_additional_macos_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '10.15'
+
+      # Fix: app_badge_plus ships PrivacyInfo.xcprivacy which CocoaPods adds to
+      # the compile-sources phase on macOS, causing 'no rule to process file of
+      # type text.xml' warnings. Exclude those files from compilation.
+      if target.name == 'app_badge_plus'
+        config.build_settings['EXCLUDED_SOURCE_FILE_NAMES'] = '*.xcprivacy'
+      end
+
+      # Fix: FirebaseSessions NanoPB extensions trigger Swift warnings about
+      # non-retroactive conformances (only available in Swift 5.10+). Suppress
+      # the warning for that target to avoid build failures on older Swift.
+      if target.name == 'FirebaseSessions'
+        config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
+      end
     end
   end
-  
-  # Patch DockProgress for Swift 6 exhaustiveness error
+
+  # Fix: suppress Xcode 15 'ignoring duplicate libraries' linker warnings.
+  # Several pods independently request the same system libs (-lc++, -lsqlite3,
+  # -lz). CocoaPods regenerates xcconfig files during pod install, so we must
+  # patch them here (after generation) rather than via config.build_settings.
+  %w[debug release profile].each do |config_name|
+    xcconfig_path = "Pods/Target Support Files/Pods-Runner/Pods-Runner.#{config_name}.xcconfig"
+    next unless File.exist?(xcconfig_path)
+
+    content = File.read(xcconfig_path)
+    next if content.include?('-Wl,-no_warn_duplicate_libraries')
+
+    patched = content.sub(
+      /^OTHER_LDFLAGS = \$\(inherited\)/,
+      'OTHER_LDFLAGS = $(inherited) -Wl,-no_warn_duplicate_libraries'
+    )
+    File.write(xcconfig_path, patched) if patched != content
+  end
+
+  # Patch DockProgress for Swift 6 exhaustiveness error.
   utilities_path = 'Pods/DockProgress/Sources/DockProgress/Utilities.swift'
   if File.exist?(utilities_path)
     puts "Patching #{utilities_path} for Swift 6 support..."

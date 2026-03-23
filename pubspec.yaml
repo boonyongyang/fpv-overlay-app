@@ -1,8 +1,6 @@
 name: fpv_overlay_app
-description: "A new Flutter project."
-# The following line prevents the package from being accidentally published to
-# pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+description: "FPV Overlay Toolbox – a macOS desktop app for burning telemetry overlays (.srt/.osd) onto FPV flight videos using FFmpeg and Python."
+publish_to: 'none'
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -39,17 +37,22 @@ dependencies:
   file_selector: ^1.0.3
   path: ^1.9.0
   shared_preferences: ^2.5.3
-  flutter_lints: ^5.0.0
   desktop_drop: ^0.5.0
   local_notifier: ^0.1.6
   macos_dock_progress: ^1.1.0
   app_badge_plus: ^1.2.6
   file: ^7.0.1
   windows_taskbar: ^1.1.2
+  firebase_core: ^2.24.0
+  firebase_analytics: ^10.8.0
+  firebase_crashlytics: ^3.5.0
+  uuid: ^4.5.2
+
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
   mocktail: ^1.0.4
 
@@ -72,6 +75,8 @@ flutter:
 
   assets:
     - assets/icons/
+    - assets/bin/
+    - assets/bin/fonts/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

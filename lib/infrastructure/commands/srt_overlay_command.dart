@@ -1,67 +1,75 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
+
+import 'package:fpv_overlay_app/core/utils/path_resolver.dart';
 import 'package:fpv_overlay_app/domain/commands/overlay_command.dart';
 import 'package:fpv_overlay_app/domain/models/app_configuration.dart';
 import 'package:fpv_overlay_app/domain/models/overlay_task.dart';
-import 'package:fpv_overlay_app/core/utils/path_resolver.dart';
+import 'package:fpv_overlay_app/infrastructure/commands/process_runner_mixin.dart';
 
-class SrtOverlayCommand implements OverlayCommand {
+class SrtOverlayCommand with ProcessRunnerMixin implements OverlayCommand {
+  @override
+  Process? activeProcess;
+
+  @override
+  void cancel() => activeProcess?.kill();
+
   @override
   Stream<String> execute(
     OverlayTask task,
     AppConfiguration config,
     String outputPath,
   ) async* {
-    yield 'Starting SRT Fast Overlay with ffmpeg...';
+    final videoPath = task.videoPath;
+    if (videoPath == null || videoPath.isEmpty) {
+      yield 'Error: No source video file specified.';
+      return;
+    }
 
-    final args = [
-      '-i',
-      task.videoPath!,
-      '-vf',
-      "subtitles='${task.overlayPath}'",
-      '-c:v',
-      'libx264',
-      '-crf',
-      '23',
-      '-preset',
-      'medium',
-      '-c:a',
-      'aac',
-      '-y',
+    final srtPath = task.srtPath;
+    if (srtPath == null || srtPath.isEmpty) {
+      yield 'Error: No SRT telemetry file specified.';
+      return;
+    }
+
+    final bundledExecutablePath = PathResolver.bundledSrtExecutablePath;
+    final scriptPath = PathResolver.srtScriptPath;
+    yield 'Runtime: FFmpeg = ${PathResolver.ffmpegPath}';
+    if (bundledExecutablePath != null) {
+      yield 'Runtime: SRT executable = $bundledExecutablePath';
+    } else {
+      yield 'Runtime: Python = ${PathResolver.pythonPath}';
+      yield 'Runtime: SRT script = $scriptPath';
+    }
+
+    if (bundledExecutablePath == null && !File(scriptPath).existsSync()) {
+      yield 'Error: SRT overlay script not found at $scriptPath';
+      return;
+    }
+
+    yield 'Starting SRT Telemetry HUD Overlay…';
+
+    final args = <String>[
+      '--srt',
+      srtPath,
+      '--video',
+      videoPath,
+      '--output',
       outputPath,
+      '--ffmpeg',
+      PathResolver.ffmpegPath,
     ];
 
-    yield* _streamProcess(PathResolver.ffmpegPath, args);
-  }
-
-  Stream<String> _streamProcess(String executable, List<String> args) async* {
-    try {
-      yield '\$ $executable ${args.join(' ')}';
-      final process = await Process.start(executable, args);
-      final controller = StreamController<String>();
-
-      process.stdout
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen((line) => controller.add(line));
-      process.stderr
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen((line) => controller.add('STDERR: $line'));
-
-      process.exitCode.then((code) {
-        if (code == 0) {
-          controller.add('✅ Process completed successfully.');
-        } else {
-          controller.add('❌ Process failed with exit code $code.');
-        }
-        controller.close();
-      });
-
-      yield* controller.stream;
-    } catch (e) {
-      yield '❌ Exception: $e';
+    final o3Path = PathResolver.o3OverlayToolPath;
+    if (o3Path != null && o3Path.isNotEmpty) {
+      args.addAll(['--tool', o3Path]);
     }
+
+    if (bundledExecutablePath != null) {
+      yield* streamProcess(bundledExecutablePath, args);
+      return;
+    }
+
+    yield* streamProcess(PathResolver.pythonPath, [scriptPath, ...args]);
   }
 }

@@ -1,84 +1,79 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
+
+import 'package:fpv_overlay_app/core/utils/path_resolver.dart';
 import 'package:fpv_overlay_app/domain/commands/overlay_command.dart';
 import 'package:fpv_overlay_app/domain/models/app_configuration.dart';
 import 'package:fpv_overlay_app/domain/models/overlay_task.dart';
-import 'package:fpv_overlay_app/core/utils/path_resolver.dart';
+import 'package:fpv_overlay_app/infrastructure/commands/process_runner_mixin.dart';
 
-class OsdOverlayCommand implements OverlayCommand {
+class OsdOverlayCommand with ProcessRunnerMixin implements OverlayCommand {
+  @override
+  Process? activeProcess;
+
+  @override
+  void cancel() => activeProcess?.kill();
+
   @override
   Stream<String> execute(
     OverlayTask task,
     AppConfiguration config,
     String outputPath,
   ) async* {
-    final o3ToolPath = PathResolver.o3OverlayToolPath;
-    if (o3ToolPath == null || o3ToolPath.isEmpty) {
-      yield 'Error: O3_OverlayTool path is not configured.';
+    final videoPath = task.videoPath;
+    if (videoPath == null || videoPath.isEmpty) {
+      yield 'Error: No source video file specified.';
       return;
     }
 
-    yield 'Starting OSD Rendering via O3_OverlayTool...';
-
-    final script = '''
-import sys
-sys.path.insert(0, '$o3ToolPath')
-from VideoMaker import VideoMaker
-from TransparentVideoMaker import TransparentVideoMaker
-from OsdFileReader import OsdFileReader
-from pathlib import Path
-
-def main():
-    print("Loading OSD...")
-    osd_reader = OsdFileReader('${task.overlayPath}', framerate=60)
-    
-    tool_path = Path('$o3ToolPath')
-    font_path = tool_path / 'fonts/WS_BFx4_Nexus_Moonlight_2160p.png'
-    if not font_path.exists():
-        font_path = tool_path / 'fonts/WS_BTFL_Conthrax_Moonlight_1440p.png'
-    
-    print("Initializing TransparentVideoMaker...")
-    video_maker = TransparentVideoMaker(osd_reader, str(font_path), fps=60)
-    
-    print("Creating video...")
-    video_maker.create_video('$outputPath', '${task.videoPath}')
-    print("Done")
-
-if __name__ == '__main__':
-    main()
-''';
-
-    yield* _streamProcess(PathResolver.pythonPath, ['-c', script]);
-  }
-
-  Stream<String> _streamProcess(String executable, List<String> args) async* {
-    try {
-      yield '\$ $executable ${args.join(' ')}';
-      final process = await Process.start(executable, args);
-      final controller = StreamController<String>();
-
-      process.stdout
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen((line) => controller.add(line));
-      process.stderr
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen((line) => controller.add('STDERR: $line'));
-
-      process.exitCode.then((code) {
-        if (code == 0) {
-          controller.add('✅ Process completed successfully.');
-        } else {
-          controller.add('❌ Process failed with exit code $code.');
-        }
-        controller.close();
-      });
-
-      yield* controller.stream;
-    } catch (e) {
-      yield '❌ Exception: $e';
+    final overlayPath = task.osdPath;
+    if (overlayPath == null || overlayPath.isEmpty) {
+      yield 'Error: No OSD file specified.';
+      return;
     }
+
+    final bundledExecutablePath = PathResolver.bundledOsdExecutablePath;
+    final scriptPath = PathResolver.osdScriptPath;
+    yield 'Runtime: FFmpeg = ${PathResolver.ffmpegPath}';
+    if (bundledExecutablePath != null) {
+      yield 'Runtime: OSD executable = $bundledExecutablePath';
+    } else {
+      yield 'Runtime: Python = ${PathResolver.pythonPath}';
+      yield 'Runtime: OSD script = $scriptPath';
+    }
+
+    if (bundledExecutablePath == null && !File(scriptPath).existsSync()) {
+      yield 'Error: OSD rendering script not found at $scriptPath';
+      yield 'Please ensure the app is correctly installed. '
+          'Try reinstalling from the original DMG or installer.';
+      return;
+    }
+
+    yield 'Starting OSD HD Rendering…';
+
+    final args = <String>[
+      '--osd',
+      overlayPath,
+      '--video',
+      videoPath,
+      '--output',
+      outputPath,
+      '--ffmpeg',
+      PathResolver.ffmpegPath,
+    ];
+
+    // Pass the O3_OverlayTool directory if available – used for font lookup.
+    // Auto-detected from ~/Downloads if the user has not set it manually.
+    final o3Path = PathResolver.o3OverlayToolPath;
+    if (o3Path != null && o3Path.isNotEmpty) {
+      args.addAll(['--tool', o3Path]);
+    }
+
+    if (bundledExecutablePath != null) {
+      yield* streamProcess(bundledExecutablePath, args);
+      return;
+    }
+
+    yield* streamProcess(PathResolver.pythonPath, [scriptPath, ...args]);
   }
 }

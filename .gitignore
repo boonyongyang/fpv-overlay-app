@@ -2,6 +2,7 @@
 *.class
 *.log
 *.pyc
+__pycache__/
 *.swp
 .DS_Store
 .atom/
@@ -15,6 +16,9 @@ migrate_working_dir/
 *.ipr
 *.iws
 .idea/
+.vscode/
+.venv-media/
+.venv-packaging/
 
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
@@ -43,3 +47,9 @@ app.*.map.json
 /android/app/release
 
 /build
+dist/
+build/downloads/
+build/macos-runtime/
+samples/output/
+samples/check24/
+*.dmg

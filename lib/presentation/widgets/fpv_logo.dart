@@ -27,60 +27,70 @@ class _FpvDronePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
+    final strokeWidth = size.width * 0.08;
+    final propellerRadius = size.width * 0.15;
+    final center = Offset(size.width / 2, size.height / 2);
+
+    // Paint for stroked elements
+    final strokePaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = size.width * 0.08
+      ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    final center = Offset(size.width / 2, size.height / 2);
-    final r = size.width * 0.15; // Propeller radius
+    // Paint for filled elements
+    final fillPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
 
     // 1. Draw the "X" frame
     canvas.drawLine(
       Offset(size.width * 0.2, size.height * 0.2),
       Offset(size.width * 0.8, size.height * 0.8),
-      paint,
+      strokePaint,
     );
     canvas.drawLine(
       Offset(size.width * 0.8, size.height * 0.2),
       Offset(size.width * 0.2, size.height * 0.8),
-      paint,
+      strokePaint,
     );
 
-    // 2. Draw the central body
+    // 2. Draw the central body (filled)
     final bodyRect = Rect.fromCenter(
       center: center,
       width: size.width * 0.25,
       height: size.height * 0.45,
     );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bodyRect, Radius.circular(size.width * 0.05)),
-      paint..style = PaintingStyle.fill,
-    );
+    final bodyRRect =
+        RRect.fromRectAndRadius(bodyRect, Radius.circular(size.width * 0.05));
+    canvas.drawRRect(bodyRRect, fillPaint);
 
-    // Draw body outline
-    paint.style = PaintingStyle.stroke;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bodyRect, Radius.circular(size.width * 0.05)),
-      paint,
-    );
+    // Draw body outline (stroked)
+    canvas.drawRRect(bodyRRect, strokePaint);
 
     // 3. Draw Propellers at the ends
-    final positions = [
+    final propellerPositions = [
       Offset(size.width * 0.2, size.height * 0.2),
       Offset(size.width * 0.8, size.height * 0.2),
       Offset(size.width * 0.2, size.height * 0.8),
       Offset(size.width * 0.8, size.height * 0.8),
     ];
 
-    for (final pos in positions) {
-      canvas.drawCircle(pos, r, paint);
-      // Small cross in the middle of propeller
+    for (final pos in propellerPositions) {
+      // Draw propeller circle
+      canvas.drawCircle(pos, propellerRadius, strokePaint);
+
+      // Draw cross in the middle of propeller
+      final crossPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size.width * 0.04
+        ..strokeCap = StrokeCap.round;
+
       canvas.drawLine(
-        Offset(pos.dx - r * 0.5, pos.dy),
-        Offset(pos.dx + r * 0.5, pos.dy),
-        paint..strokeWidth = size.width * 0.04,
+        Offset(pos.dx - propellerRadius * 0.5, pos.dy),
+        Offset(pos.dx + propellerRadius * 0.5, pos.dy),
+        crossPaint,
       );
     }
   }
