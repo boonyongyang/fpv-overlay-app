@@ -3,16 +3,15 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:fpv_overlay_app/application/providers/local_stats_provider.dart';
 import 'package:fpv_overlay_app/domain/models/app_configuration.dart';
 import 'package:fpv_overlay_app/domain/models/overlay_task.dart';
 import 'package:fpv_overlay_app/domain/models/task_addition_result.dart';
-import 'package:fpv_overlay_app/domain/services/telemetry.dart';
 import 'package:fpv_overlay_app/domain/services/task_failure_parser.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:fpv_overlay_app/infrastructure/services/engine_service.dart';
 import 'package:fpv_overlay_app/infrastructure/services/command_runner_service.dart';
-import 'package:fpv_overlay_app/infrastructure/services/firebase/crashlytics_service.dart';
 import 'package:fpv_overlay_app/domain/services/os_service.dart';
 
 final _segmentStemRe = RegExp(r'^(.*?)(\d+)$');
@@ -21,29 +20,32 @@ class TaskQueueProvider extends ChangeNotifier {
   final EngineService _engineService;
   final CommandRunnerService _commandRunnerService;
   final OsService _osService;
+  final LocalStatsProvider _localStatsProvider;
 
   final List<OverlayTask> _tasks = [];
   bool _isProcessing = false;
   bool _cancelRequested = false;
+  bool _clearAfterCancel = false;
 
   TaskQueueProvider({
     required EngineService engineService,
     required CommandRunnerService commandRunnerService,
     required OsService osService,
+    required LocalStatsProvider localStatsProvider,
   })  : _engineService = engineService,
         _commandRunnerService = commandRunnerService,
-        _osService = osService;
+        _osService = osService,
+        _localStatsProvider = localStatsProvider;
 
   List<OverlayTask> get tasks => List.unmodifiable(_tasks);
   bool get isProcessing => _isProcessing;
   bool get isCancelling => _cancelRequested;
+  bool get willClearAfterCancel => _clearAfterCancel;
 
   void addTask(OverlayTask task) {
     _tasks.add(task);
     _updateDockState();
     notifyListeners();
-    Telemetry.taskAdded(task);
-    _updateCrashlyticsKeys();
   }
 
   void addManualTask({
@@ -201,9 +203,6 @@ class TaskQueueProvider extends ChangeNotifier {
   }
 
   void removeTask(String id) {
-    final removed =
-        _tasks.where((t) => t.id == id && t.status != TaskStatus.processing);
-    if (removed.isNotEmpty) Telemetry.taskRemoved(id);
     _tasks.removeWhere((t) => t.id == id && t.status != TaskStatus.processing);
     _updateDockState();
     notifyListeners();
@@ -214,6 +213,21 @@ class TaskQueueProvider extends ChangeNotifier {
     _cancelRequested = true;
     _commandRunnerService.cancelCurrentTask();
     notifyListeners();
+  }
+
+  void cancelAndClearAll() {
+    if (_tasks.isEmpty) return;
+    if (_isProcessing) {
+      _clearAfterCancel = true;
+      if (_cancelRequested) {
+        notifyListeners();
+      } else {
+        cancelQueue();
+      }
+      return;
+    }
+
+    clearAll();
   }
 
   void clearCompleted() {
@@ -229,12 +243,6 @@ class TaskQueueProvider extends ChangeNotifier {
     _tasks.removeWhere((t) => t.status != TaskStatus.processing);
     _updateDockState();
     notifyListeners();
-  }
-
-  void _updateCrashlyticsKeys() {
-    final crashlytics = CrashlyticsService.instance;
-    unawaited(crashlytics.setCustomKey('platform', Platform.operatingSystem));
-    unawaited(crashlytics.setCustomKey('queue_length', _tasks.length));
   }
 
   void _updateDockState() {
@@ -363,6 +371,20 @@ class TaskQueueProvider extends ChangeNotifier {
   static final _compositingRe = RegExp(r'Compositing:\s*(\d+)%');
   static final _renderingRe = RegExp(r'Rendering:\s*(\d+)%');
 
+  void _appendSystemLog(OverlayTask task, String message) {
+    final timestamp = DateTime.now().toIso8601String();
+    task.logs.add('[$timestamp] $message');
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    if (hours > 0) return '${hours}h ${minutes}m ${seconds}s';
+    if (minutes > 0) return '${minutes}m ${seconds}s';
+    return '${seconds}s';
+  }
+
   /// Parses a log line and updates [task.progress] and [task.progressPhase].
   ///
   /// For OSD / combined tasks the budget is:
@@ -428,14 +450,6 @@ class TaskQueueProvider extends ChangeNotifier {
     _updateDockState();
     notifyListeners();
 
-    final pendingCount = _tasks
-        .where(
-          (t) =>
-              t.status == TaskStatus.pending || t.status == TaskStatus.failed,
-        )
-        .length;
-    Telemetry.queueStarted(pendingCount);
-
     for (int i = 0; i < _tasks.length; i++) {
       if (_cancelRequested) break;
 
@@ -445,21 +459,29 @@ class TaskQueueProvider extends ChangeNotifier {
         task.status = TaskStatus.processing;
         task.startTime = DateTime.now();
         task.cpuUsageAtStart = await _osService.getCpuUsage();
-        if (task.cpuUsageAtStart != null) {
-          Telemetry.cpuUsage(task.cpuUsageAtStart!);
-        }
         task.logs.clear();
         task.errorMessage = null;
         task.failure = null;
         task.progress = 0.0;
         task.progressPhase = null;
         notifyListeners();
-        Telemetry.taskProcessing(task.id);
 
         try {
           final stem = p.basenameWithoutExtension(task.videoFileName);
           final preferredPath = '${stem}_overlay.mp4';
           task.outputPath = _getUniqueOutputPath(outputDir, preferredPath);
+          _appendSystemLog(
+            task,
+            '▶ Queue starting task ${i + 1}/${_tasks.length} · ${task.type.name.toUpperCase()}',
+          );
+          _appendSystemLog(task, '▸ Video: ${task.videoPath ?? 'Missing'}');
+          if (task.osdPath != null) {
+            _appendSystemLog(task, '▸ OSD: ${task.osdPath}');
+          }
+          if (task.srtPath != null) {
+            _appendSystemLog(task, '▸ SRT: ${task.srtPath}');
+          }
+          _appendSystemLog(task, '◎ Output: ${task.outputPath!}');
 
           final stream =
               _commandRunnerService.executeTask(task, config, task.outputPath!);
@@ -476,15 +498,19 @@ class TaskQueueProvider extends ChangeNotifier {
           if (_cancelRequested) {
             task.status = TaskStatus.cancelled;
             task.progress = 0.0;
-            Telemetry.taskCancelled(task.id);
+            _appendSystemLog(task, '⏹ Task cancelled by user request.');
           } else if (task.logs.isNotEmpty &&
               task.logs.last.contains('✅ Process completed successfully')) {
             task.status = TaskStatus.completed;
             task.progress = 1.0;
-
-            final durationSec =
-                task.endTime!.difference(task.startTime!).inSeconds;
-            Telemetry.taskCompleted(task, durationSec);
+            _appendSystemLog(
+              task,
+              '✓ Task completed in ${_formatDuration(task.duration ?? Duration.zero)}.',
+            );
+            _appendSystemLog(
+              task,
+              '★ Result ready at ${task.outputPath ?? 'unknown output path'}.',
+            );
 
             unawaited(
               _osService.showNotification(
@@ -497,12 +523,8 @@ class TaskQueueProvider extends ChangeNotifier {
             task.status = TaskStatus.failed;
             task.failure = TaskFailureParser.fromLogs(task.logs);
             task.errorMessage = task.failure!.summary;
+            _appendSystemLog(task, '✖ Task failed: ${task.failure!.summary}');
             debugPrint(task.logs.join('\n'));
-            Telemetry.taskFailed(task.id, task.errorMessage!);
-            unawaited(
-              CrashlyticsService.instance
-                  .log('Task failed: ${task.id} – ${task.errorMessage}'),
-            );
           }
         } catch (e, st) {
           task.endTime = DateTime.now();
@@ -510,38 +532,34 @@ class TaskQueueProvider extends ChangeNotifier {
           task.failure =
               TaskFailureParser.fromException(e, st, logs: task.logs);
           task.errorMessage = task.failure!.summary;
-          Telemetry.taskFailed(task.id, task.errorMessage!);
-          unawaited(CrashlyticsService.instance.recordError(e, st));
+          _appendSystemLog(
+            task,
+            '⚠ Unhandled failure: ${task.failure!.summary}',
+          );
+          debugPrint('Task failed: ${task.id}\n$e\n$st');
         }
 
+        unawaited(_localStatsProvider.recordRun(task));
         _updateDockState();
         notifyListeners();
         if (_cancelRequested) break;
       }
     }
 
+    final shouldClearAfterCancel = _clearAfterCancel;
     _isProcessing = false;
     _cancelRequested = false;
+    _clearAfterCancel = false;
+
+    if (shouldClearAfterCancel) {
+      _tasks.clear();
+      _updateDockState();
+      notifyListeners();
+      return;
+    }
 
     final completedCount =
         _tasks.where((t) => t.status == TaskStatus.completed).length;
-    final failedCount =
-        _tasks.where((t) => t.status == TaskStatus.failed).length;
-    final cancelledCount =
-        _tasks.where((t) => t.status == TaskStatus.cancelled).length;
-    final totalDurationSec =
-        _tasks.where((t) => t.startTime != null && t.endTime != null).fold<int>(
-              0,
-              (sum, t) => sum + t.endTime!.difference(t.startTime!).inSeconds,
-            );
-
-    Telemetry.queueCompleted(
-      totalTasks: pendingCount,
-      completedCount: completedCount,
-      failedCount: failedCount,
-      cancelledCount: cancelledCount,
-      totalDurationSec: totalDurationSec,
-    );
 
     if (completedCount > 0) {
       unawaited(
@@ -552,7 +570,6 @@ class TaskQueueProvider extends ChangeNotifier {
       );
     }
 
-    _updateCrashlyticsKeys();
     _updateDockState();
     notifyListeners();
   }
