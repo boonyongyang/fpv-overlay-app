@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest a workflow improvement, UX enhancement, or packaging capability.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the user workflow or contributor pain point.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Explain the behavior or UX you want.
+    validations:
+      required: true
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Constraints or tradeoffs
+      description: Mention platform limits, packaging concerns, or compatibility risks.

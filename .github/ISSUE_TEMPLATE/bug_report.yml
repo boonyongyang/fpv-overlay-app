@@ -1,0 +1,45 @@
+name: Bug report
+description: Report a broken workflow, packaging issue, or unexpected app behavior.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the problem and the affected workflow.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include filenames, telemetry type, and platform if relevant.
+      placeholder: |
+        1. Open the queue
+        2. Add files...
+        3. Start render...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics or logs
+      description: Paste the copied diagnostics report or relevant task logs if available.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Windows
+        - Other / source-only
+    validations:
+      required: true

@@ -1,221 +1,160 @@
 # FPV Overlay Toolbox
 
-A cross-platform desktop application built with Flutter for FPV pilots who want to burn telemetry overlays (`.srt` / `.osd`) onto their flight videos, with bundled overlay assets and a self-contained macOS release pipeline.
+FPV Overlay Toolbox is a Flutter desktop app for turning flight footage plus telemetry into finished FPV overlay videos.
 
----
+It supports:
 
-## Features
+- fast subtitle overlays from `.srt`
+- full graphical overlays from `.osd`
+- combined `.osd` + `.srt` renders in one output
+- DJI split-recording flows where a later clip reuses the earlier segment's `.osd`
 
-- **SRT Fast Overlay** — burn DJI-style subtitle telemetry into video via FFmpeg. No re-encode of the video stream; just a fast subtitle burn-in.
-- **OSD HD Rendering** — two-pass Python+FFmpeg pipeline that reconstructs the full graphical OSD (gauges, attitude indicator, voltage, etc.) from a `.osd` binary log and composites it onto the video in HD quality.
-- **Combined OSD + SRT** — when both `.osd` and `.srt` are present for the same clip, both are composited onto a single output in one pass.
-- **Batch Queue** — drag-and-drop or scan entire folders; the engine auto-pairs video files with matching telemetry by filename stem.
-- **Smart Pairing** — orphaned files (video without telemetry, or telemetry without video) are held in the queue and can be linked individually later.
-- **Bundled Overlay Assets** — rendering scripts (`osd_overlay.py`, `srt_overlay.py`), `OsdFileReader.py`, and 28 OSD font sprite sheets ship with the app.
-- **Self-Contained macOS Builds** — release packaging bundles standalone overlay executables plus `ffmpeg`/`ffprobe` into the `.app`, so end users do not need Homebrew or a local Python setup.
-- **Smart Runtime Resolution** — the app prefers bundled runtimes when present, otherwise auto-detects FFmpeg and Python from standard system locations during development.
-- **Desktop-native UX** — macOS dock badge & progress bar, Windows taskbar progress, system notifications, and drag-and-drop.
-- **Privacy-first analytics** — Firebase Analytics + Crashlytics with a one-tap opt-out in the System Info tab.
+The project is published as a source-first open-source desktop app. The main value is the utility itself, and the codebase is intentionally structured to also showcase professional Flutter desktop product work: layered app architecture, queue state management, diagnostics, packaging scripts, and platform-aware UX.
 
----
+## Desktop UX Highlights
 
-## Installation
+- **Command palette** with `Cmd/Ctrl + K` for queue actions, navigation, diagnostics, and the workflow tour
+- **Controllable queue workspace** with search, status filters, overlay-type filters, and sort modes
+- **Focused task log view** for renderer output, failure traces, and copyable diagnostics
+- **First-run onboarding** plus a reusable workflow tour
+- **Local runtime diagnostics** for FFmpeg, Python, output strategy, and overlay assets
+- **Desktop-native behavior** including drag-and-drop, notifications, macOS dock progress, and Windows taskbar progress
 
-Download the latest release for your platform:
+## What Problem It Solves
 
-| Platform | Format |
-|---|---|
-| **macOS** | `.dmg` — drag to Applications and run |
-| **Windows** | `.exe` installer |
+Most FPV overlay workflows are still fragmented:
 
-> macOS release builds package the required overlay runtime into the app. Source builds still auto-detect dependencies from the host system.
+- subtitle overlays are quick but visually limited
+- full OSD overlays are often tied to scripts or one-off tooling
+- long DJI recordings complicate clip-to-telemetry matching
+- sharing a working setup usually means explaining FFmpeg, Python, and asset dependencies by hand
 
----
+FPV Overlay Toolbox wraps that into a desktop workflow with one queue, one diagnostics surface, and one product shell.
 
-## File Types Supported
+## How The Workflow Works
 
-| Extension | Format | Overlay mode |
-|---|---|---|
-| `.mp4`, `.mov` | Source video | — |
-| `.srt` | DJI / Walksnail subtitle telemetry | SRT Fast |
-| `.osd` | Betaflight / INAV / DJI binary OSD log | OSD HD Rendering |
-| `.osd` + `.srt` | Both present for same clip | Combined (single output) |
+1. Add mixed video and telemetry files, or scan a folder.
+2. The matching engine pairs files by stem and keeps incomplete tasks visible instead of discarding them.
+3. If a later DJI split clip has no exact `.osd`, the queue can reuse the nearest preceding `.osd`.
+4. Review queue items, open task logs when needed, then start the batch render.
+5. Copy a diagnostics report at any point if the environment or a specific task needs investigation.
 
----
+## Architecture At A Glance
 
-## Architecture
+The repo keeps a clear layered structure:
 
-The project follows a layered architecture with clear separation of concerns:
+- `presentation/` for the desktop UI, onboarding, command palette, and task log views
+- `application/` for ChangeNotifier-driven workspace, settings, navigation, and queue state
+- `domain/` for task models, failure classification, and command interfaces
+- `infrastructure/` for file matching, storage, platform services, and subprocess orchestration
 
-```
-lib/
-├── main.dart                  # App entry point & provider wiring
-├── firebase_options.dart      # Auto-generated Firebase config
-│
-├── application/               # App-level state (ChangeNotifiers)
-│   └── providers/
-│       ├── firebase_provider.dart
-│       ├── navigation_provider.dart
-│       ├── settings_provider.dart
-│       └── task_queue_provider.dart
-│
-├── core/                      # Cross-cutting utilities
-│   └── utils/
-│       ├── path_resolver.dart     # Dynamic FFmpeg/Python/script detection
-│       └── platform_utils.dart    # Cross-platform shell helpers
-│
-├── domain/                    # Pure Dart: models, abstractions, contracts
-│   ├── commands/
-│   │   └── overlay_command.dart   # Abstract command interface
-│   ├── models/
-│   │   ├── app_configuration.dart
-│   │   ├── overlay_task.dart      # Task model with status & overlay type enums
-│   │   └── task_addition_result.dart
-│   └── services/
-│       ├── os_service.dart        # Abstract platform service
-│       └── telemetry.dart         # Fire-and-forget analytics facade
-│
-├── infrastructure/            # Concrete implementations
-│   ├── commands/
-│   │   ├── combined_overlay_command.dart
-│   │   ├── osd_overlay_command.dart
-│   │   ├── process_runner_mixin.dart  # Shared subprocess streaming
-│   │   └── srt_overlay_command.dart
-│   └── services/
-│       ├── command_runner_service.dart
-│       ├── engine_service.dart        # File-pair matching logic
-│       ├── macos_os_service.dart
-│       ├── picker_service.dart
-│       ├── placeholder_os_service.dart
-│       ├── storage_service.dart       # SharedPreferences wrapper
-│       ├── windows_os_service.dart
-│       └── firebase/
-│           ├── analytics_service.dart
-│           ├── crashlytics_service.dart
-│           └── firebase_initializer.dart
-│
-└── presentation/              # Flutter UI
-    ├── navigation/
-    │   └── firebase_route_observer.dart
-    ├── pages/
-    │   ├── help_page.dart
-    │   ├── settings_page.dart
-    │   └── task_queue_page.dart
-    └── widgets/
-        ├── fpv_logo.dart              # Custom-painted drone icon
-        ├── navigation/
-        │   └── app_sidebar.dart
-        └── task_queue/
-            ├── action_bars.dart
-            ├── dashboard_stats_row.dart
-            ├── empty_state_view.dart
-            ├── performance_insights_card.dart
-            ├── snack_bar_helpers.dart
-            └── task_card.dart
-```
+Key implementation decisions:
 
-### Key design decisions
+- **Flutter owns the desktop product shell**  
+  Queue UX, diagnostics, state transitions, onboarding, and desktop presentation are all handled in Flutter.
 
-- **Provider** for state management — lightweight and idiomatic for desktop.
-- **Command pattern** — `OverlayCommand` decouples the UI from specific FFmpeg/Python invocations. Three concrete implementations: `SrtOverlayCommand`, `OsdOverlayCommand`, `CombinedOverlayCommand`.
-- **`ProcessRunnerMixin`** — shared subprocess streaming logic eliminates duplication between overlay commands.
-- **`OsService` abstraction** — `MacOSOsService`, `WindowsOsService`, and `PlaceholderOsService` keep platform-specific code (dock badge, taskbar progress, notifications) isolated from business logic.
-- **`Telemetry` facade** — fire-and-forget analytics calls that silently no-op when disabled, so business-logic tests stay clean without mocking Firebase.
-- **`PathResolver`** — resolves bundled overlay assets plus bundled-or-system FFmpeg/Python at runtime, with a development fallback to `assets/bin/`.
+- **Renderer logic stays isolated**  
+  Python + FFmpeg are still the right fit for the OSD rendering path, but they live behind command abstractions so the UI layer stays clean.
 
----
+- **Source-first local product posture**  
+  Overlay stats, queue diagnostics, and media processing remain local to the device. This repo does not ship analytics or cloud reporting.
 
-## Testing
+## Privacy / Local-Only Posture
+
+FPV Overlay Toolbox processes local files on the local machine.
+
+- media files are not uploaded during normal app use
+- local stats remain on-device
+- diagnostics reports are copied manually by the user when needed
+- the public repo does not include Firebase analytics or crash-reporting configuration
+
+See [PRIVACY.md](PRIVACY.md) for the explicit privacy statement.
+
+## Samples And Regression Media
+
+The source repo intentionally does **not** commit the raw DJI sample media.
+
+- sample metadata lives in [samples/manifest.json](samples/manifest.json)
+- usage notes live in [samples/README.md](samples/README.md)
+- raw regression inputs should be distributed through GitHub release assets or another lightweight download path
+
+The canonical sample pack includes:
+
+- `DJIG0024.mp4`
+- `DJIG0024.osd`
+- `DJIG0024.srt`
+- `DJIG0025.mp4`
+- `DJIG0025.srt`
+
+That pack exercises the important split-recording case where clip `25` reuses the earlier `.osd` timeline.
+
+## Development
+
+The repo pins Flutter with [`.fvmrc`](.fvmrc).
+
+Install dependencies:
 
 ```bash
-flutter test
+fvm flutter pub get
 ```
 
-| Test file | Coverage |
-|---|---|
-| `test/domain/telemetry_test.dart` | Telemetry facade method signatures |
-| `test/infrastructure/services/engine_service_test.dart` | File-pair matching with `MemoryFileSystem` |
-| `test/application/providers/task_queue_provider_test.dart` | Task CRUD and queue state management |
-| `test/integration/task_telemetry_test.dart` | End-to-end task lifecycle → analytics wiring |
-
----
-
-## Getting Started (development)
+Run the app locally:
 
 ```bash
-# 1. Clone
-git clone https://github.com/YangBo17/fpv-overlay-app.git
-cd fpv-overlay-app
-
-# 2. Install Flutter dependencies
-flutter pub get
-
-# 3. Run on macOS
-flutter run -d macos
+fvm flutter run -d macos
 ```
 
-> **Developer note:** When running from source, the app auto-detects FFmpeg and Python from standard Homebrew install locations. You will need `ffmpeg` and `python3` with `numpy`, `pillow`, and `pandas` installed on your system for overlay processing to work.
-
-## Release Packaging
-
-The shortest release path is:
+Useful commands:
 
 ```bash
-make release
-```
-
-That flow bootstraps Flutter dependencies, installs CocoaPods with the required UTF-8 locale, runs analysis and tests, builds the macOS app, bundles the overlay runtime into the `.app`, and creates a drag-to-Applications DMG in `dist/`.
-
-If you want to run the steps individually:
-
-```bash
+make pub-get
 make bootstrap
-make check
+make analyze
+make test
 make build-macos-release
 make package-macos-runtime
 make dmg
 ```
 
-`make dmg` also prepares the bundled runtime automatically before packaging. If you need a custom app bundle path or version label:
+Windows packaging must be run on Windows:
 
-```bash
-./tools/create_dmg.sh "/path/to/FPV Overlay Toolbox.app" 1.0.0
+```powershell
+make build-windows-release
+make package-windows-runtime
+make windows-installer
 ```
 
-The packaging scripts ad-hoc sign the local `.app` after embedding the runtime so it remains launchable. For public release-quality distribution, you should still codesign and notarize the `.app` and `.dmg` with your Apple Developer account before uploading to GitHub Releases.
+## Packaging Scripts
 
-### Samples
+The repo includes desktop packaging scripts and runtime bundling helpers, including:
 
-The repository includes a real split-segment regression case in [`samples/`](./samples):
+- [tools/prepare_macos_app_runtime.sh](tools/prepare_macos_app_runtime.sh)
+- [tools/create_dmg.sh](tools/create_dmg.sh)
+- [tools/build_windows_overlay_runtime.ps1](tools/build_windows_overlay_runtime.ps1)
+- [tools/prepare_windows_release.ps1](tools/prepare_windows_release.ps1)
+- [tools/create_windows_installer.ps1](tools/create_windows_installer.ps1)
 
-- `DJIG0024.mp4/.osd/.srt`
-- `DJIG0025.mp4/.srt`
-
-This is useful for validating the long-recording DJI behavior where clip `25` reuses clip `24`'s single `.osd` file.
-
-### Project utilities (not part of the Flutter app runtime)
-
-The `tools/` directory contains standalone dev scripts:
-
-| Script | Purpose |
-|---|---|
-| `tools/batch-overlay-unified.py` | Legacy CLI reference script for quick local experiments |
-| `tools/build_macos_overlay_runtime.sh` | Builds standalone macOS overlay executables from the Python scripts with PyInstaller |
-| `tools/prepare_macos_app_runtime.sh` | Bundles the overlay executables plus `ffmpeg`/`ffprobe` into the release `.app` |
-| `tools/create_dmg.sh` | Packages the release `.app` into a DMG and prepares the bundled runtime first |
-| `tools/generate_app_icons.py` | Generates app icon PNGs at various sizes |
-| `tools/fpv-overlay` | Shell wrapper for the legacy batch processor |
-
-> The published desktop app uses the production overlay pipeline in `assets/bin/`, not the legacy batch helper above.
-
----
+This public pass focuses on a strong source codebase and desktop product UX. Packaging scripts are included, but this README does not claim fully validated public release artifacts.
 
 ## Contributing
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you'd like to change.
+Start with:
 
----
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+
+The most useful contribution areas right now are queue workflow improvements, better diagnostics, media-path edge cases, and packaging polish.
+
+## Credits / Upstream References
+
+- The OSD layout and rendering behavior were informed by the upstream [`wtfos-configurator` `osd-overlay`](https://github.com/fpv-wtf/wtfos-configurator/tree/master/src/osd-overlay) implementation.
+- `OsdFileReader.py` is derived from the [O3_OverlayTool project](https://github.com/xNuclearSquirrel/O3_OverlayTool/releases).
+
+See [assets/bin/README.md](assets/bin/README.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the current provenance notes.
 
 ## License
 
 MIT
+
+See [LICENSE](LICENSE).
