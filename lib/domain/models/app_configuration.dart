@@ -7,14 +7,18 @@ class AppConfiguration {
   final String? lastUsedOutputDirectory;
   final String? defaultOutputDirectory;
   final String? o3OverlayToolPath;
-  final bool analyticsEnabled;
+  final bool hasCompletedOnboarding;
+  final List<String> recentInputDirectories;
+  final List<String> recentOutputDirectories;
 
   const AppConfiguration({
     this.lastUsedInputDirectory,
     this.lastUsedOutputDirectory,
     this.defaultOutputDirectory,
     this.o3OverlayToolPath,
-    this.analyticsEnabled = true,
+    this.hasCompletedOnboarding = false,
+    this.recentInputDirectories = const [],
+    this.recentOutputDirectories = const [],
   });
 
   AppConfiguration copyWith({
@@ -22,7 +26,9 @@ class AppConfiguration {
     Object? lastUsedOutputDirectory = _absent,
     Object? defaultOutputDirectory = _absent,
     Object? o3OverlayToolPath = _absent,
-    bool? analyticsEnabled,
+    Object? hasCompletedOnboarding = _absent,
+    Object? recentInputDirectories = _absent,
+    Object? recentOutputDirectories = _absent,
   }) {
     return AppConfiguration(
       lastUsedInputDirectory: identical(lastUsedInputDirectory, _absent)
@@ -37,7 +43,19 @@ class AppConfiguration {
       o3OverlayToolPath: identical(o3OverlayToolPath, _absent)
           ? this.o3OverlayToolPath
           : o3OverlayToolPath as String?,
-      analyticsEnabled: analyticsEnabled ?? this.analyticsEnabled,
+      hasCompletedOnboarding: identical(hasCompletedOnboarding, _absent)
+          ? this.hasCompletedOnboarding
+          : hasCompletedOnboarding as bool,
+      recentInputDirectories: identical(recentInputDirectories, _absent)
+          ? this.recentInputDirectories
+          : List<String>.unmodifiable(
+              recentInputDirectories as List<String>,
+            ),
+      recentOutputDirectories: identical(recentOutputDirectories, _absent)
+          ? this.recentOutputDirectories
+          : List<String>.unmodifiable(
+              recentOutputDirectories as List<String>,
+            ),
     );
   }
 
@@ -49,7 +67,15 @@ class AppConfiguration {
         other.lastUsedOutputDirectory == lastUsedOutputDirectory &&
         other.defaultOutputDirectory == defaultOutputDirectory &&
         other.o3OverlayToolPath == o3OverlayToolPath &&
-        other.analyticsEnabled == analyticsEnabled;
+        other.hasCompletedOnboarding == hasCompletedOnboarding &&
+        _listsEqual(
+          other.recentInputDirectories,
+          recentInputDirectories,
+        ) &&
+        _listsEqual(
+          other.recentOutputDirectories,
+          recentOutputDirectories,
+        );
   }
 
   @override
@@ -58,7 +84,9 @@ class AppConfiguration {
         lastUsedOutputDirectory,
         defaultOutputDirectory,
         o3OverlayToolPath,
-        analyticsEnabled,
+        hasCompletedOnboarding,
+        Object.hashAll(recentInputDirectories),
+        Object.hashAll(recentOutputDirectories),
       );
 
   @override
@@ -67,5 +95,18 @@ class AppConfiguration {
       'lastUsedOutputDirectory: $lastUsedOutputDirectory, '
       'defaultOutputDirectory: $defaultOutputDirectory, '
       'o3OverlayToolPath: $o3OverlayToolPath, '
-      'analyticsEnabled: $analyticsEnabled)';
+      'hasCompletedOnboarding: $hasCompletedOnboarding, '
+      'recentInputDirectories: $recentInputDirectories, '
+      'recentOutputDirectories: $recentOutputDirectories)';
+}
+
+bool _listsEqual(List<String> left, List<String> right) {
+  if (identical(left, right)) return true;
+  if (left.length != right.length) return false;
+  for (int index = 0; index < left.length; index++) {
+    if (left[index] != right[index]) {
+      return false;
+    }
+  }
+  return true;
 }

@@ -1,20 +1,22 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:provider/provider.dart';
 import 'package:local_notifier/local_notifier.dart';
 
-import 'package:fpv_overlay_app/application/providers/firebase_provider.dart';
+import 'package:fpv_overlay_app/application/providers/local_stats_provider.dart';
 import 'package:fpv_overlay_app/application/providers/navigation_provider.dart';
 import 'package:fpv_overlay_app/application/providers/settings_provider.dart';
+import 'package:fpv_overlay_app/application/providers/workspace_provider.dart';
+import 'package:fpv_overlay_app/core/constants/app_identity.dart';
 import 'package:fpv_overlay_app/application/providers/task_queue_provider.dart';
+import 'package:fpv_overlay_app/domain/models/app_configuration.dart';
 import 'package:fpv_overlay_app/infrastructure/services/command_runner_service.dart';
 import 'package:fpv_overlay_app/infrastructure/services/engine_service.dart';
-import 'package:fpv_overlay_app/domain/services/telemetry.dart';
-import 'package:fpv_overlay_app/infrastructure/services/firebase/firebase_initializer.dart';
+import 'package:fpv_overlay_app/infrastructure/services/local_stats_service.dart';
 import 'package:fpv_overlay_app/infrastructure/services/picker_service.dart';
 import 'package:fpv_overlay_app/infrastructure/services/storage_service.dart';
-import 'package:fpv_overlay_app/presentation/navigation/firebase_route_observer.dart';
 import 'package:fpv_overlay_app/presentation/pages/settings_page.dart';
 import 'package:fpv_overlay_app/presentation/pages/task_queue_page.dart';
 import 'package:fpv_overlay_app/presentation/pages/help_page.dart';
@@ -24,24 +26,20 @@ import 'package:fpv_overlay_app/infrastructure/services/windows_os_service.dart'
 import 'package:fpv_overlay_app/infrastructure/services/placeholder_os_service.dart';
 import 'package:fpv_overlay_app/presentation/widgets/fpv_logo.dart';
 import 'package:fpv_overlay_app/presentation/widgets/navigation/app_sidebar.dart';
+import 'package:fpv_overlay_app/presentation/widgets/workspace/command_palette_overlay.dart';
+import 'package:fpv_overlay_app/presentation/widgets/workspace/onboarding_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await FirebaseInitializer.init();
-
-  Telemetry.appLaunched(appVersion: '1.0.0');
-
   await localNotifier.setup(
-    appName: 'FPV Overlay Toolbox',
+    appName: AppIdentity.name,
     shortcutPolicy: ShortcutPolicy.requireCreate,
   );
 
   runApp(
-    const FirebaseProvider(
-      child: _AppProviders(
-        child: FpvOverlayApp(),
-      ),
+    const _AppProviders(
+      child: FpvOverlayApp(),
     ),
   );
 }
@@ -56,6 +54,7 @@ class _AppProviders extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<StorageService>(create: (_) => StorageService()),
+        Provider<LocalStatsService>(create: (_) => LocalStatsService()),
         Provider<PickerService>(create: (_) => PickerService()),
         Provider<EngineService>(create: (_) => EngineService()),
         Provider<CommandRunnerService>(create: (_) => CommandRunnerService()),
@@ -73,22 +72,30 @@ class _AppProviders extends StatelessWidget {
           update: (_, storage, previous) =>
               previous ?? SettingsProvider(storageService: storage),
         ),
-        ChangeNotifierProxyProvider3<EngineService, CommandRunnerService,
-            OsService, TaskQueueProvider>(
+        ChangeNotifierProvider(
+          create: (context) => LocalStatsProvider(
+            localStatsService: context.read<LocalStatsService>(),
+          )..load(),
+        ),
+        ChangeNotifierProxyProvider4<EngineService, CommandRunnerService,
+            OsService, LocalStatsProvider, TaskQueueProvider>(
           create: (context) => TaskQueueProvider(
             engineService: context.read<EngineService>(),
             commandRunnerService: context.read<CommandRunnerService>(),
             osService: context.read<OsService>(),
+            localStatsProvider: context.read<LocalStatsProvider>(),
           ),
-          update: (_, engine, runner, os, previous) =>
+          update: (_, engine, runner, os, localStats, previous) =>
               previous ??
               TaskQueueProvider(
                 engineService: engine,
                 commandRunnerService: runner,
                 osService: os,
+                localStatsProvider: localStats,
               ),
         ),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
+        ChangeNotifierProvider(create: (_) => WorkspaceProvider()),
       ],
       child: child,
     );
@@ -98,13 +105,10 @@ class _AppProviders extends StatelessWidget {
 class FpvOverlayApp extends StatelessWidget {
   const FpvOverlayApp({super.key});
 
-  // Keep the observer alive for the lifetime of the app.
-  static final _routeObserver = FirebaseRouteObserver();
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'FPV Overlay',
+      title: AppIdentity.name,
       theme: ThemeData(
         brightness: Brightness.light,
         colorSchemeSeed: Colors.cyan,
@@ -117,23 +121,53 @@ class FpvOverlayApp extends StatelessWidget {
       ),
       themeMode: ThemeMode.dark,
       debugShowCheckedModeBanner: false,
-      navigatorObservers: [FpvOverlayApp._routeObserver],
       home: const MainScreen(),
     );
   }
 }
 
-class MainScreen extends StatelessWidget {
+class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
+
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  AppConfiguration? _lastSyncedConfiguration;
+  bool _sidebarCollapsed = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final navProvider = context.watch<NavigationProvider>();
+    final settingsProvider = context.watch<SettingsProvider>();
+    final workspace = context.watch<WorkspaceProvider>();
     final selectedIndex = navProvider.currentIndex;
-    final isMobile = MediaQuery.of(context).size.width < 800;
+    final mediaWidth = MediaQuery.of(context).size.width;
+    final isTouchPlatform = Platform.isAndroid || Platform.isIOS;
+    final isMobile = isTouchPlatform && mediaWidth < 960;
+    final forceCollapsedSidebar = mediaWidth < 980;
+    final isSidebarCollapsed =
+        !isMobile && (forceCollapsedSidebar || _sidebarCollapsed);
+    final sidebarWidth = isSidebarCollapsed
+        ? 84.0
+        : mediaWidth < 1080
+            ? 216.0
+            : 260.0;
 
-    return Scaffold(
+    if (!settingsProvider.isLoading &&
+        _lastSyncedConfiguration != settingsProvider.config) {
+      _lastSyncedConfiguration = settingsProvider.config;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context
+            .read<WorkspaceProvider>()
+            .syncFromConfiguration(settingsProvider.config);
+      });
+    }
+
+    final scaffold = Scaffold(
       appBar: isMobile ? _buildMobileAppBar(context, theme) : null,
       bottomNavigationBar:
           isMobile ? _buildBottomNav(theme, selectedIndex, navProvider) : null,
@@ -141,8 +175,15 @@ class MainScreen extends StatelessWidget {
         children: [
           if (!isMobile)
             AppSidebar(
+              width: sidebarWidth,
+              compact: !isSidebarCollapsed && sidebarWidth < 240,
+              collapsed: isSidebarCollapsed,
               selectedIndex: selectedIndex,
               onTabSelected: navProvider.setTab,
+              onToggleCollapsed: forceCollapsedSidebar
+                  ? null
+                  : () =>
+                      setState(() => _sidebarCollapsed = !_sidebarCollapsed),
             ),
           Expanded(
             child: ColoredBox(
@@ -160,6 +201,137 @@ class MainScreen extends StatelessWidget {
         ],
       ),
     );
+
+    return PlatformMenuBar(
+      menus: [
+        PlatformMenu(
+          label: AppIdentity.name,
+          menus: [
+            if (PlatformProvidedMenuItem.hasMenu(
+              PlatformProvidedMenuItemType.about,
+            ))
+              const PlatformProvidedMenuItem(
+                type: PlatformProvidedMenuItemType.about,
+              ),
+            PlatformMenuItemGroup(
+              members: [
+                PlatformMenuItem(
+                  label: 'Preferences...',
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.comma,
+                    meta: true,
+                  ),
+                  onSelected: () => navProvider.setTab(1),
+                ),
+                PlatformMenuItem(
+                  label: 'Command Palette',
+                  shortcut: const SingleActivator(
+                    LogicalKeyboardKey.keyK,
+                    meta: true,
+                  ),
+                  onSelected: () => workspace.toggleCommandPalette(),
+                ),
+              ],
+            ),
+            if (PlatformProvidedMenuItem.hasMenu(
+              PlatformProvidedMenuItemType.servicesSubmenu,
+            ))
+              const PlatformProvidedMenuItem(
+                type: PlatformProvidedMenuItemType.servicesSubmenu,
+              ),
+            PlatformMenuItemGroup(
+              members: [
+                if (PlatformProvidedMenuItem.hasMenu(
+                  PlatformProvidedMenuItemType.hide,
+                ))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.hide,
+                  ),
+                if (PlatformProvidedMenuItem.hasMenu(
+                  PlatformProvidedMenuItemType.hideOtherApplications,
+                ))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.hideOtherApplications,
+                  ),
+                if (PlatformProvidedMenuItem.hasMenu(
+                  PlatformProvidedMenuItemType.showAllApplications,
+                ))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.showAllApplications,
+                  ),
+              ],
+            ),
+            if (PlatformProvidedMenuItem.hasMenu(
+              PlatformProvidedMenuItemType.quit,
+            ))
+              const PlatformProvidedMenuItem(
+                type: PlatformProvidedMenuItemType.quit,
+              ),
+          ],
+        ),
+        PlatformMenu(
+          label: 'Window',
+          menus: [
+            if (PlatformProvidedMenuItem.hasMenu(
+              PlatformProvidedMenuItemType.minimizeWindow,
+            ))
+              const PlatformProvidedMenuItem(
+                type: PlatformProvidedMenuItemType.minimizeWindow,
+              ),
+            if (PlatformProvidedMenuItem.hasMenu(
+              PlatformProvidedMenuItemType.zoomWindow,
+            ))
+              const PlatformProvidedMenuItem(
+                type: PlatformProvidedMenuItemType.zoomWindow,
+              ),
+            if (PlatformProvidedMenuItem.hasMenu(
+              PlatformProvidedMenuItemType.toggleFullScreen,
+            ))
+              const PlatformProvidedMenuItem(
+                type: PlatformProvidedMenuItemType.toggleFullScreen,
+              ),
+            PlatformMenuItemGroup(
+              members: [
+                if (PlatformProvidedMenuItem.hasMenu(
+                  PlatformProvidedMenuItemType.arrangeWindowsInFront,
+                ))
+                  const PlatformProvidedMenuItem(
+                    type: PlatformProvidedMenuItemType.arrangeWindowsInFront,
+                  ),
+              ],
+            ),
+          ],
+        ),
+        PlatformMenu(
+          label: 'Help',
+          menus: [
+            PlatformMenuItem(
+              label: '${AppIdentity.name} Help',
+              onSelected: () => navProvider.setTab(2),
+            ),
+          ],
+        ),
+      ],
+      child: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(
+            LogicalKeyboardKey.keyK,
+            meta: true,
+          ): workspace.toggleCommandPalette,
+          const SingleActivator(
+            LogicalKeyboardKey.keyK,
+            control: true,
+          ): workspace.toggleCommandPalette,
+        },
+        child: Stack(
+          children: [
+            scaffold,
+            if (workspace.isCommandPaletteOpen) const CommandPaletteOverlay(),
+            if (workspace.isOnboardingVisible) const OnboardingOverlay(),
+          ],
+        ),
+      ),
+    );
   }
 
   AppBar _buildMobileAppBar(BuildContext context, ThemeData theme) {
@@ -168,11 +340,14 @@ class MainScreen extends StatelessWidget {
         children: [
           const FpvLogo(size: 24, color: Colors.cyanAccent),
           const SizedBox(width: 10),
-          Text(
-            'FPV Overlay',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
+          Expanded(
+            child: Text(
+              AppIdentity.name,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
+              ),
             ),
           ),
         ],
@@ -198,10 +373,10 @@ class MainScreen extends StatelessWidget {
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.info_outline_rounded),
-          label: 'System',
+          label: 'Stats',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.help_outline),
+          icon: Icon(Icons.help_outline_rounded),
           label: 'Help',
         ),
       ],

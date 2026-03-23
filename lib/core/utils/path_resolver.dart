@@ -45,14 +45,21 @@ class PathResolver {
         }
       }
     } else if (Platform.isWindows) {
-      if (exePath.contains('\\data\\')) {
-        return p.join(
-          p.dirname(exePath),
+      final bundledCandidates = <String>[
+        p.join(p.dirname(exePath), 'data', 'flutter_assets', 'assets', 'bin'),
+        p.join(
+          Directory.current.path,
           'data',
           'flutter_assets',
           'assets',
           'bin',
-        );
+        ),
+      ];
+
+      for (final bundledPath in bundledCandidates) {
+        if (Directory(bundledPath).existsSync()) {
+          return bundledPath;
+        }
       }
     }
 

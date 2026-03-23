@@ -23,6 +23,7 @@ enum OverlayType {
 
 class OverlayTask {
   final String id;
+  final DateTime createdAt;
   String? videoPath;
 
   /// Path to the binary OSD telemetry file (`.osd`), if present.
@@ -46,6 +47,7 @@ class OverlayTask {
 
   OverlayTask({
     required this.id,
+    DateTime? createdAt,
     this.videoPath,
     this.osdPath,
     this.srtPath,
@@ -55,7 +57,8 @@ class OverlayTask {
     this.outputPath,
     this.failure,
     List<String>? logs,
-  }) : logs = logs ?? [];
+  })  : createdAt = createdAt ?? DateTime.now(),
+        logs = logs ?? [];
 
   /// Derived overlay type based on which telemetry files are present.
   OverlayType get type {
@@ -105,6 +108,7 @@ class OverlayTask {
   }) {
     return OverlayTask(
       id: id,
+      createdAt: createdAt,
       videoPath: videoPath ?? this.videoPath,
       osdPath: osdPath ?? this.osdPath,
       srtPath: srtPath ?? this.srtPath,
@@ -125,6 +129,7 @@ class OverlayTask {
   int get hashCode => id.hashCode;
 
   @override
-  String toString() => 'OverlayTask(id: $id, status: $status, type: $type, '
+  String toString() => 'OverlayTask(id: $id, createdAt: $createdAt, '
+      'status: $status, type: $type, '
       'video: $videoPath, osd: $osdPath, srt: $srtPath)';
 }

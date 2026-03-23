@@ -5,7 +5,10 @@ class StorageService {
   static const String _lastInputKey = 'last_input_dir';
   static const String _lastOutputKey = 'last_output_dir';
   static const String _defaultOutputKey = 'default_output_dir';
-  static const String _analyticsEnabledKey = 'analytics_enabled';
+  static const String _o3OverlayToolPathKey = 'o3_overlay_tool_path';
+  static const String _hasCompletedOnboardingKey = 'has_completed_onboarding';
+  static const String _recentInputDirsKey = 'recent_input_dirs';
+  static const String _recentOutputDirsKey = 'recent_output_dirs';
 
   Future<AppConfiguration> loadConfig() async {
     final prefs = await SharedPreferences.getInstance();
@@ -13,7 +16,15 @@ class StorageService {
       lastUsedInputDirectory: prefs.getString(_lastInputKey),
       lastUsedOutputDirectory: prefs.getString(_lastOutputKey),
       defaultOutputDirectory: prefs.getString(_defaultOutputKey),
-      analyticsEnabled: prefs.getBool(_analyticsEnabledKey) ?? true,
+      o3OverlayToolPath: prefs.getString(_o3OverlayToolPathKey),
+      hasCompletedOnboarding:
+          prefs.getBool(_hasCompletedOnboardingKey) ?? false,
+      recentInputDirectories: List.unmodifiable(
+        prefs.getStringList(_recentInputDirsKey) ?? const [],
+      ),
+      recentOutputDirectories: List.unmodifiable(
+        prefs.getStringList(_recentOutputDirsKey) ?? const [],
+      ),
     );
   }
 
@@ -31,11 +42,33 @@ class StorageService {
     } else {
       await prefs.remove(_defaultOutputKey);
     }
-    await prefs.setBool(_analyticsEnabledKey, config.analyticsEnabled);
+    if (config.o3OverlayToolPath != null) {
+      await prefs.setString(_o3OverlayToolPathKey, config.o3OverlayToolPath!);
+    } else {
+      await prefs.remove(_o3OverlayToolPathKey);
+    }
+    await prefs.setBool(
+      _hasCompletedOnboardingKey,
+      config.hasCompletedOnboarding,
+    );
+    await prefs.setStringList(
+      _recentInputDirsKey,
+      config.recentInputDirectories,
+    );
+    await prefs.setStringList(
+      _recentOutputDirsKey,
+      config.recentOutputDirectories,
+    );
   }
 
   Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await prefs.remove(_lastInputKey);
+    await prefs.remove(_lastOutputKey);
+    await prefs.remove(_defaultOutputKey);
+    await prefs.remove(_o3OverlayToolPathKey);
+    await prefs.remove(_hasCompletedOnboardingKey);
+    await prefs.remove(_recentInputDirsKey);
+    await prefs.remove(_recentOutputDirsKey);
   }
 }
