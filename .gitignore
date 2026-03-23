@@ -19,6 +19,7 @@ migrate_working_dir/
 .vscode/
 .venv-media/
 .venv-packaging/
+.venv-packaging-windows/
 
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
@@ -50,6 +51,16 @@ app.*.map.json
 dist/
 build/downloads/
 build/macos-runtime/
+build/windows-downloads/
+build/windows-runtime/
+dist/windows/
+firebase.json
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+macos/Runner/GoogleService-Info.plist
+samples/*.mp4
+samples/*.osd
+samples/*.srt
 samples/output/
 samples/check24/
 *.dmg

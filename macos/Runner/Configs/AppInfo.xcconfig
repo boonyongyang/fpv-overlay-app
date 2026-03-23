@@ -8,7 +8,7 @@
 PRODUCT_NAME = FPV Overlay Toolbox
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = io.github.fpvoverlay.toolbox
+PRODUCT_BUNDLE_IDENTIFIER = io.github.boonyongyang.fpvoverlaytoolbox
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 FPV Overlay Team. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 FPV Overlay Toolbox. All rights reserved.

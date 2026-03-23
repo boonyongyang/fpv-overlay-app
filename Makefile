@@ -3,11 +3,14 @@ SHELL := /bin/bash
 FVM ?= fvm
 FLUTTER := $(FVM) flutter
 DART := $(FVM) dart
+PWSH ?= pwsh
 UTF8_ENV := LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 DMG_SCRIPT := ./tools/create_dmg.sh
 PREPARE_RUNTIME_SCRIPT := ./tools/prepare_macos_app_runtime.sh
+PREPARE_WINDOWS_RUNTIME_SCRIPT := ./tools/prepare_windows_release.ps1
+WINDOWS_INSTALLER_SCRIPT := ./tools/create_windows_installer.ps1
 
-.PHONY: help pub-get pods bootstrap format analyze test check runtime-check clean build-macos-debug build-macos-release package-macos-runtime dmg release
+.PHONY: help pub-get pods bootstrap format analyze test check runtime-check clean build-macos-debug build-macos-release package-macos-runtime dmg release build-windows-release package-windows-runtime windows-installer
 
 help: ## Show available commands
 	@grep -E '^[a-zA-Z0-9._-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "%-22s %s\n", $$1, $$2}'
@@ -56,4 +59,13 @@ package-macos-runtime: ## Bundle ffmpeg and standalone overlay executables into 
 dmg: ## Package the existing release app into a DMG
 	$(DMG_SCRIPT)
 
-release: bootstrap check build-macos-release dmg ## Full release flow
+release: bootstrap check build-macos-release package-macos-runtime dmg ## Full release flow
+
+build-windows-release: ## Build the Windows release app (run on Windows)
+	$(FLUTTER) build windows --release
+
+package-windows-runtime: ## Bundle ffmpeg and standalone overlay executables into the Windows release app (run on Windows)
+	$(PWSH) -NoProfile -ExecutionPolicy Bypass -File $(PREPARE_WINDOWS_RUNTIME_SCRIPT)
+
+windows-installer: ## Build the Windows installer EXE with Inno Setup (run on Windows)
+	$(PWSH) -NoProfile -ExecutionPolicy Bypass -File $(WINDOWS_INSTALLER_SCRIPT)

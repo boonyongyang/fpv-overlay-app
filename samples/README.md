@@ -1,8 +1,20 @@
 ## Samples
 
-This directory contains real DJI sample inputs used to validate the overlay pipeline.
+This directory keeps lightweight metadata for the regression sample pack used by FPV Overlay Toolbox.
 
-Included source files:
+The raw DJI media files are intentionally not committed to the source repository. They are large enough to make a normal clone unnecessarily heavy, and they are better distributed as release assets.
+
+See [manifest.json](manifest.json) for the expected sample pack contents.
+
+### Why the sample pack exists
+
+The pack is useful for validating:
+
+- exact-match video + SRT + OSD pairing
+- split DJI recordings where a later clip reuses an earlier `.osd`
+- queue behavior when later clips need inferred OSD offsets
+
+### Expected files
 
 - `DJIG0024.mp4`
 - `DJIG0024.osd`
@@ -10,8 +22,4 @@ Included source files:
 - `DJIG0025.mp4`
 - `DJIG0025.srt`
 
-These samples reproduce the long-recording split case where `DJIG0025` reuses
-the single `DJIG0024.osd` file.
-
-Generated previews and rendered outputs are intentionally ignored by git and
-should not be committed from this directory.
+Generated renders, previews, and temporary outputs remain ignored by git.

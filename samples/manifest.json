@@ -1,0 +1,31 @@
+{
+  "sample_pack": "fpv-overlay-toolbox-regression-pack",
+  "version": "2026.03",
+  "distribution": "GitHub Releases",
+  "notes": [
+    "Raw regression media is intentionally not committed to keep the source repository lightweight.",
+    "Use the release sample pack when you need to validate DJI split-recording matching behavior."
+  ],
+  "files": [
+    {
+      "name": "DJIG0024.mp4",
+      "role": "Base video clip for exact-match SRT and OSD validation"
+    },
+    {
+      "name": "DJIG0024.osd",
+      "role": "Primary OSD timeline reused by the following split clip"
+    },
+    {
+      "name": "DJIG0024.srt",
+      "role": "Matching subtitle telemetry for clip 24"
+    },
+    {
+      "name": "DJIG0025.mp4",
+      "role": "Later split clip that reuses the earlier OSD timeline"
+    },
+    {
+      "name": "DJIG0025.srt",
+      "role": "Matching subtitle telemetry for clip 25"
+    }
+  ]
+}

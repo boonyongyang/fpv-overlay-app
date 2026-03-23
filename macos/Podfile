@@ -49,12 +49,6 @@ post_install do |installer|
         config.build_settings['EXCLUDED_SOURCE_FILE_NAMES'] = '*.xcprivacy'
       end
 
-      # Fix: FirebaseSessions NanoPB extensions trigger Swift warnings about
-      # non-retroactive conformances (only available in Swift 5.10+). Suppress
-      # the warning for that target to avoid build failures on older Swift.
-      if target.name == 'FirebaseSessions'
-        config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
-      end
     end
   end
 

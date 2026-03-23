@@ -1,5 +1,7 @@
 name: fpv_overlay_app
-description: "FPV Overlay Toolbox – a macOS desktop app for burning telemetry overlays (.srt/.osd) onto FPV flight videos using FFmpeg and Python."
+description: "FPV Overlay Toolbox – a cross-platform desktop app for burning telemetry overlays (.srt/.osd) onto FPV flight videos using FFmpeg and Python."
+repository: https://github.com/boonyongyang/fpv-overlay-app
+issue_tracker: https://github.com/boonyongyang/fpv-overlay-app/issues
 publish_to: 'none'
 
 # The following defines the version and build number for your application.
@@ -43,9 +45,6 @@ dependencies:
   app_badge_plus: ^1.2.6
   file: ^7.0.1
   windows_taskbar: ^1.1.2
-  firebase_core: ^2.24.0
-  firebase_analytics: ^10.8.0
-  firebase_crashlytics: ^3.5.0
   uuid: ^4.5.2
 
 

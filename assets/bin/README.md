@@ -1,27 +1,43 @@
 # Overlay Runtime Assets
 
-This directory contains the Python overlay scripts and font assets used by the desktop app.
+This directory contains the production renderer sources used by the desktop app.
 
-## Contents
+## What Lives Here
 
-| Item | Purpose |
+| Item | Role |
 |---|---|
-| `osd_overlay.py` | Two-pass OSD HD rendering compositor |
-| `srt_overlay.py` | SRT subtitle overlay script |
-| `OsdFileReader.py` | Binary OSD file parser (imported by `osd_overlay.py`) |
-| `fonts/` | 28 OSD font sprite sheets (BetaFlight, INAV, DJI OG) |
-| `ffmpeg`, `ffprobe` | Bundled into the macOS release app under `Contents/Resources/runtime/` |
+| `osd_overlay.py` | Full OSD compositor for `.osd` overlays, with optional SRT telemetry on the same render pass |
+| `srt_overlay.py` | Subtitle-driven telemetry overlay path for `.srt` only workflows |
+| `OsdFileReader.py` | Bundled OSD parser imported by `osd_overlay.py` |
+| `fonts/` | Bundled OSD font sprite sheets used by the renderer |
 
-## How it works
+Release builds bundle `ffmpeg` and `ffprobe` separately under the platform runtime directory:
 
-`PathResolver` in `lib/core/utils/path_resolver.dart` locates these files at runtime:
+- macOS: `Contents/Resources/runtime/`
+- Windows: `runtime\`
 
-- **Production (macOS .app):** Resolves to Flutter's app-bundle asset path under `App.framework/.../flutter_assets/assets/bin/`.
-- **Production (Windows .exe):** Resolves to `data/flutter_assets/assets/bin/` next to the executable.
-- **Development (`flutter run`):** Falls back to this source-tree directory (`assets/bin/`). FFmpeg and Python are resolved from bundled binaries when present, otherwise from the system PATH / Homebrew.
+## Provenance
 
-## Build packaging
+The renderer in this repo is not a verbatim copy of one upstream source.
 
-The scripts and font sheets committed here are bundled automatically via Flutter's asset pipeline.
+- The OSD layout and render behavior were informed by the upstream [`wtfos-configurator` `osd-overlay`](https://github.com/fpv-wtf/wtfos-configurator/tree/master/src/osd-overlay) implementation.
+- `OsdFileReader.py` is a bundled parser derived from the [O3_OverlayTool project](https://github.com/xNuclearSquirrel/O3_OverlayTool/releases).
 
-The repository does not commit third-party runtime binaries, but the macOS release packaging flow now downloads static `ffmpeg`/`ffprobe` archives and freezes the Python overlays into standalone executables before building the DMG.
+The scripts here adapt those ideas into the runtime model used by FPV Overlay Toolbox: command-line entrypoints, bundled fonts, split-segment handling, and packaged desktop releases.
+
+## Runtime Resolution
+
+`PathResolver` in `lib/core/utils/path_resolver.dart` resolves assets and runtimes like this:
+
+- **Release app bundles:** prefer the embedded runtime and embedded overlay executables
+- **Flutter asset bundle:** load renderer sources from `assets/bin/`
+- **Development fallback:** use the source tree and local machine runtimes when no bundled runtime exists
+
+## Packaging Notes
+
+The scripts and font sheets committed here are shipped via Flutter assets.
+
+The repo does not commit third-party runtime binaries. Instead, the packaging scripts download FFmpeg archives and freeze the Python entrypoints into standalone executables during macOS and Windows release packaging.
+
+See `THIRD_PARTY_NOTICES.md` at the repo root for the current public-source
+summary of provenance and redistribution follow-up items.
