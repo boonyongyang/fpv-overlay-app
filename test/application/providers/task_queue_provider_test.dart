@@ -1,8 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:fpv_overlay_app/application/providers/local_stats_provider.dart';
 import 'package:fpv_overlay_app/application/providers/task_queue_provider.dart';
+import 'package:fpv_overlay_app/domain/models/app_configuration.dart';
 import 'package:fpv_overlay_app/domain/models/overlay_task.dart';
-import 'package:fpv_overlay_app/domain/services/telemetry.dart';
 import 'package:fpv_overlay_app/infrastructure/services/engine_service.dart';
 import 'package:fpv_overlay_app/infrastructure/services/command_runner_service.dart';
 import 'package:fpv_overlay_app/domain/services/os_service.dart';
@@ -13,30 +14,49 @@ class MockCommandRunnerService extends Mock implements CommandRunnerService {}
 
 class MockOsService extends Mock implements OsService {}
 
+class MockLocalStatsProvider extends Mock implements LocalStatsProvider {}
+
+class _FakeOverlayTask extends Fake implements OverlayTask {}
+
+class _FakeAppConfiguration extends Fake implements AppConfiguration {}
+
 void main() {
-  // Disable telemetry so Firebase is never initialised during unit tests.
-  setUpAll(() => Telemetry.setEnabled(false));
-  tearDownAll(() => Telemetry.setEnabled(true));
+  setUpAll(() {
+    registerFallbackValue(_FakeOverlayTask());
+    registerFallbackValue(_FakeAppConfiguration());
+  });
   late TaskQueueProvider provider;
   late MockEngineService mockEngine;
   late MockCommandRunnerService mockRunner;
   late MockOsService mockOs;
+  late MockLocalStatsProvider mockLocalStats;
 
   setUp(() {
     mockEngine = MockEngineService();
     mockRunner = MockCommandRunnerService();
     mockOs = MockOsService();
+    mockLocalStats = MockLocalStatsProvider();
 
     provider = TaskQueueProvider(
       engineService: mockEngine,
       commandRunnerService: mockRunner,
       osService: mockOs,
+      localStatsProvider: mockLocalStats,
     );
 
     // Setup default behavior for OsService
     when(() => mockOs.updateBadge(any())).thenReturn(null);
     when(() => mockOs.updateDockProgress(any())).thenReturn(null);
     when(() => mockOs.resetDockProgress()).thenReturn(null);
+    when(() => mockOs.getCpuUsage()).thenAnswer((_) async => null);
+    when(
+      () => mockOs.showNotification(
+        title: any(named: 'title'),
+        body: any(named: 'body'),
+        silent: any(named: 'silent'),
+      ),
+    ).thenAnswer((_) async {});
+    when(() => mockLocalStats.recordRun(any())).thenAnswer((_) async {});
   });
 
   group('TaskQueueProvider - Task Management', () {
@@ -167,6 +187,42 @@ void main() {
       expect(provider.tasks, isEmpty);
       verify(() => mockOs.updateBadge(1)).called(1);
       verify(() => mockOs.updateBadge(0)).called(1);
+    });
+
+    test('Should record a completed run in local stats after success',
+        () async {
+      provider.addManualTask(
+        videoPath: '/data/flight01.mp4',
+        overlayPath: '/data/flight01.srt',
+      );
+
+      when(() => mockRunner.executeTask(any(), any(), any())).thenAnswer(
+        (_) => Stream.fromIterable([
+          'Starting...',
+          '✅ Process completed successfully',
+        ]),
+      );
+
+      await provider.startQueue(const AppConfiguration(), '/out');
+
+      expect(provider.tasks.first.status, TaskStatus.completed);
+      verify(() => mockLocalStats.recordRun(any())).called(1);
+    });
+
+    test('Should record a failed run in local stats after failure', () async {
+      provider.addManualTask(
+        videoPath: '/data/flight02.mp4',
+        overlayPath: '/data/flight02.srt',
+      );
+
+      when(() => mockRunner.executeTask(any(), any(), any())).thenAnswer(
+        (_) => Stream.fromIterable(['Error: something went wrong']),
+      );
+
+      await provider.startQueue(const AppConfiguration(), '/out');
+
+      expect(provider.tasks.first.status, TaskStatus.failed);
+      verify(() => mockLocalStats.recordRun(any())).called(1);
     });
   });
 }
