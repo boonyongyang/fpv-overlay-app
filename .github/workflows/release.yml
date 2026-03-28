@@ -1,0 +1,368 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing git tag to build and publish (e.g. v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  validate:
+    name: Validate release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      ref: ${{ steps.meta.outputs.ref }}
+
+    steps:
+      - name: Resolve tag and version
+        id: meta
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            TAG="${{ inputs.release_tag }}"
+          else
+            TAG="$GITHUB_REF_NAME"
+          fi
+          if [[ ! "$TAG" =~ ^v[0-9] ]]; then
+            echo "Invalid tag format '$TAG' — expected v<semver>" >&2
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "ref=refs/tags/$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Validate pubspec version matches tag
+        shell: bash
+        run: |
+          PUBSPEC_VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
+          if [[ "$PUBSPEC_VERSION" != "${{ steps.meta.outputs.version }}" ]]; then
+            echo "pubspec.yaml version ($PUBSPEC_VERSION) does not match tag (${{ steps.meta.outputs.version }})" >&2
+            exit 1
+          fi
+
+      - name: Validate CLI release metadata
+        shell: bash
+        run: |
+          chmod +x tools/verify_cli_release_metadata.sh
+          tools/verify_cli_release_metadata.sh --tag "${{ steps.meta.outputs.tag }}"
+
+  build-macos:
+    name: Build macOS DMG
+    needs: validate
+    runs-on: macos-14
+    outputs:
+      sha256: ${{ steps.checksum.outputs.sha256 }}
+      artifact_name: ${{ steps.artifact.outputs.artifact_name }}
+      checksum_name: ${{ steps.artifact.outputs.checksum_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.ref }}
+
+      - name: Set artifact names
+        id: artifact
+        shell: bash
+        run: |
+          ARTIFACT_NAME="fpv-overlay-toolbox-macos-${{ needs.validate.outputs.version }}.dmg"
+          CHECKSUM_NAME="${ARTIFACT_NAME}.sha256"
+          echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
+          echo "checksum_name=$CHECKSUM_NAME"  >> "$GITHUB_OUTPUT"
+
+      - name: Setup FVM
+        uses: leoafarias/fvm-action@v1
+        with:
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: fvm flutter pub get
+
+      - name: Ensure CocoaPods is available
+        run: |
+          if ! command -v pod >/dev/null 2>&1; then
+            sudo gem install cocoapods
+          fi
+
+      - name: Install macOS pods
+        run: cd macos && pod install
+
+      - name: Prepare build scripts
+        run: |
+          chmod +x \
+            tools/build_macos_overlay_runtime.sh \
+            tools/prepare_macos_app_runtime.sh \
+            tools/create_dmg.sh
+
+      - name: Build macOS app
+        run: fvm flutter build macos --release
+
+      - name: Package DMG
+        run: tools/create_dmg.sh
+
+      - name: Compute checksum
+        id: checksum
+        shell: bash
+        run: |
+          DMG="dist/${{ steps.artifact.outputs.artifact_name }}"
+          if [[ ! -f "$DMG" ]]; then
+            echo "Expected DMG not found: $DMG" >&2; exit 1
+          fi
+          SHA256="$(shasum -a 256 "$DMG" | awk '{print $1}')"
+          printf '%s  %s\n' "$SHA256" "${{ steps.artifact.outputs.artifact_name }}" \
+            > "dist/${{ steps.artifact.outputs.checksum_name }}"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: |
+            dist/${{ steps.artifact.outputs.artifact_name }}
+            dist/${{ steps.artifact.outputs.checksum_name }}
+          if-no-files-found: error
+          retention-days: 1
+
+  build-windows:
+    name: Build Windows installer
+    needs: validate
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.ref }}
+
+      - name: Setup FVM
+        uses: leoafarias/fvm-action@v1
+        with:
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: fvm flutter pub get
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Windows app
+        run: fvm flutter build windows --release
+
+      - name: Package Windows installer
+        shell: pwsh
+        run: .\tools\create_windows_installer.ps1
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/windows/*-setup.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  build-cli-arm64:
+    name: Build CLI (macOS arm64)
+    needs: validate
+    runs-on: macos-14
+    outputs:
+      sha256: ${{ steps.checksum.outputs.sha256 }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.ref }}
+
+      - name: Setup FVM
+        uses: leoafarias/fvm-action@v1
+        with:
+          cache: true
+
+      - name: Prepare build scripts
+        run: |
+          chmod +x \
+            tools/build_macos_overlay_runtime.sh \
+            tools/build_cli_runtime_macos.sh \
+            tools/build_cli_release_macos.sh \
+            tools/render_homebrew_formula.sh \
+            tools/verify_cli_release_metadata.sh
+
+      - name: Build CLI release archive
+        run: make build-cli-release-macos
+
+      - name: Compute checksum
+        id: checksum
+        shell: bash
+        run: |
+          ARCHIVE="$(ls build/cli-release/*.tar.gz | head -1)"
+          SHA256="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
+          ARTIFACT="$(basename "$ARCHIVE")"
+          printf '%s  %s\n' "$SHA256" "$ARTIFACT" \
+            > "build/cli-release/${ARTIFACT%.tar.gz}.sha256"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload CLI arm64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-arm64
+          path: |
+            build/cli-release/*.tar.gz
+            build/cli-release/*.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  build-cli-x64:
+    name: Build CLI (macOS x64)
+    needs: validate
+    runs-on: macos-13
+    outputs:
+      sha256: ${{ steps.checksum.outputs.sha256 }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.ref }}
+
+      - name: Setup FVM
+        uses: leoafarias/fvm-action@v1
+        with:
+          cache: true
+
+      - name: Prepare build scripts
+        run: |
+          chmod +x \
+            tools/build_macos_overlay_runtime.sh \
+            tools/build_cli_runtime_macos.sh \
+            tools/build_cli_release_macos.sh \
+            tools/render_homebrew_formula.sh \
+            tools/verify_cli_release_metadata.sh
+
+      - name: Build CLI release archive
+        run: make build-cli-release-macos
+
+      - name: Compute checksum
+        id: checksum
+        shell: bash
+        run: |
+          ARCHIVE="$(ls build/cli-release/*.tar.gz | head -1)"
+          SHA256="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
+          ARTIFACT="$(basename "$ARCHIVE")"
+          printf '%s  %s\n' "$SHA256" "$ARTIFACT" \
+            > "build/cli-release/${ARTIFACT%.tar.gz}.sha256"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload CLI x64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-x64
+          path: |
+            build/cli-release/*.tar.gz
+            build/cli-release/*.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish release
+    needs:
+      - validate
+      - build-macos
+      - build-windows
+      - build-cli-arm64
+      - build-cli-x64
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      TAG: ${{ needs.validate.outputs.tag }}
+      VERSION: ${{ needs.validate.outputs.version }}
+      MACOS_SHA256: ${{ needs.build-macos.outputs.sha256 }}
+      ARM64_SHA256: ${{ needs.build-cli-arm64.outputs.sha256 }}
+      X64_SHA256: ${{ needs.build-cli-x64.outputs.sha256 }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.ref }}
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: build/release-assets
+
+      - name: Create GitHub release (if not already exists)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists — skipping create."
+          else
+            gh release create "$TAG" \
+              --verify-tag \
+              --title "$TAG" \
+              --generate-notes
+          fi
+
+      - name: Upload all build artifacts to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s globstar nullglob
+          gh release upload "$TAG" \
+            build/release-assets/macos-dmg/*.dmg \
+            build/release-assets/macos-dmg/*.sha256 \
+            build/release-assets/windows-installer/*.exe \
+            build/release-assets/cli-arm64/*.tar.gz \
+            build/release-assets/cli-arm64/*.sha256 \
+            build/release-assets/cli-x64/*.tar.gz \
+            build/release-assets/cli-x64/*.sha256 \
+            --clobber
+
+      - name: Render macOS update manifest
+        run: |
+          chmod +x tools/render_macos_update_manifest.sh
+          MACOS_DMG="$(ls build/release-assets/macos-dmg/*.dmg | head -1)"
+          ARTIFACT_NAME="$(basename "$MACOS_DMG")"
+          tools/render_macos_update_manifest.sh \
+            --output build/release-assets/latest-macos.json \
+            --repository "${GITHUB_REPOSITORY}" \
+            --release-tag "$TAG" \
+            --version "$VERSION" \
+            --artifact-name "$ARTIFACT_NAME" \
+            --sha256 "$MACOS_SHA256" \
+            --published-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      - name: Render Homebrew formula
+        run: |
+          chmod +x tools/render_homebrew_formula.sh
+          tools/render_homebrew_formula.sh \
+            --tag "$TAG" \
+            --version "$VERSION" \
+            --arm64-sha "$ARM64_SHA256" \
+            --x64-sha "$X64_SHA256" \
+            --output build/release-assets/fpv-overlay.rb
+
+      - name: Upload manifest and Homebrew formula to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$TAG" \
+            build/release-assets/latest-macos.json \
+            build/release-assets/fpv-overlay.rb \
+            --clobber
