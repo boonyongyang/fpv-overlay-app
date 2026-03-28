@@ -21,9 +21,11 @@ class UpdateProvider extends ChangeNotifier {
   final String? _currentVersion;
 
   UpdateInfo? _availableUpdate;
+  String? _resolvedVersion;
 
   UpdateInfo? get availableUpdate => _availableUpdate;
   bool get hasUpdate => _availableUpdate != null;
+  String? get resolvedVersion => _resolvedVersion;
 
   void dismiss() {
     if (_availableUpdate == null) return;
@@ -35,9 +37,11 @@ class UpdateProvider extends ChangeNotifier {
     try {
       final version =
           _currentVersion ?? (await PackageInfo.fromPlatform()).version;
+      _resolvedVersion = version;
       final update = await _updateService.checkForUpdate(version);
-      if (update == null) return;
-      _availableUpdate = update;
+      if (update != null) {
+        _availableUpdate = update;
+      }
       notifyListeners();
     } catch (_) {
       // silently absorb all errors — update check must never crash the app

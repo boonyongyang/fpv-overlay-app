@@ -2,7 +2,6 @@ class AppIdentity {
   AppIdentity._();
 
   static const name = 'FPV Overlay Toolbox';
-  static const version = '1.0.0';
   static const repositoryUrl =
       'https://github.com/boonyongyang/fpv-overlay-app';
   static const releasesUrl =

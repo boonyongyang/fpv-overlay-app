@@ -80,5 +80,13 @@ void main() {
       final result = await service.checkForUpdate('1.9.9');
       expect(result, isNotNull);
     });
+
+    test('detects patch version bump as newer', () async {
+      final client = MockClient((_) async => manifest('1.0.1'));
+      final service = HttpUpdateService(client: client);
+      final result = await service.checkForUpdate('1.0.0');
+      expect(result, isNotNull);
+      expect(result!.version, '1.0.1');
+    });
   });
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'package:fpv_overlay_app/application/providers/update_provider.dart';
 import 'package:fpv_overlay_app/core/constants/app_identity.dart';
 import 'package:fpv_overlay_app/presentation/widgets/fpv_logo.dart';
 
@@ -168,8 +170,8 @@ class _SidebarHeader extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             compact
-                ? 'Desktop v${AppIdentity.version}'
-                : 'Desktop workspace v${AppIdentity.version}',
+                ? 'Desktop v${context.watch<UpdateProvider>().resolvedVersion ?? '...'}'
+                : 'Desktop workspace v${context.watch<UpdateProvider>().resolvedVersion ?? '...'}',
             style: theme.textTheme.labelSmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant.withAlpha(150),
             ),

@@ -48,11 +48,11 @@ class HttpUpdateService implements UpdateService {
     return false;
   }
 
-  static List<int> _parse(String version) => List.generate(
-        3,
-        (i) {
-          final parts = version.split('.');
-          return i < parts.length ? (int.tryParse(parts[i]) ?? 0) : 0;
-        },
-      );
+  static List<int> _parse(String version) {
+    final parts = version.split('.');
+    return List.generate(
+      3,
+      (i) => i < parts.length ? (int.tryParse(parts[i]) ?? 0) : 0,
+    );
+  }
 }
