@@ -28,6 +28,10 @@ import 'package:fpv_overlay_app/presentation/widgets/fpv_logo.dart';
 import 'package:fpv_overlay_app/presentation/widgets/navigation/app_sidebar.dart';
 import 'package:fpv_overlay_app/presentation/widgets/workspace/command_palette_overlay.dart';
 import 'package:fpv_overlay_app/presentation/widgets/workspace/onboarding_overlay.dart';
+import 'package:fpv_overlay_app/application/providers/update_provider.dart';
+import 'package:fpv_overlay_app/domain/services/update_service.dart';
+import 'package:fpv_overlay_app/infrastructure/services/http_update_service.dart';
+import 'package:fpv_overlay_app/presentation/widgets/update_banner.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -96,6 +100,12 @@ class _AppProviders extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
         ChangeNotifierProvider(create: (_) => WorkspaceProvider()),
+        Provider<UpdateService>(create: (_) => HttpUpdateService()),
+        ChangeNotifierProvider(
+          create: (context) => UpdateProvider(
+            updateService: context.read<UpdateService>(),
+          ),
+        ),
       ],
       child: child,
     );
@@ -186,16 +196,23 @@ class _MainScreenState extends State<MainScreen> {
                       setState(() => _sidebarCollapsed = !_sidebarCollapsed),
             ),
           Expanded(
-            child: ColoredBox(
-              color: theme.colorScheme.surface,
-              child: IndexedStack(
-                index: selectedIndex,
-                children: const [
-                  TaskQueuePage(),
-                  SettingsPage(),
-                  HelpPage(),
-                ],
-              ),
+            child: Column(
+              children: [
+                const UpdateBanner(),
+                Expanded(
+                  child: ColoredBox(
+                    color: theme.colorScheme.surface,
+                    child: IndexedStack(
+                      index: selectedIndex,
+                      children: const [
+                        TaskQueuePage(),
+                        SettingsPage(),
+                        HelpPage(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
