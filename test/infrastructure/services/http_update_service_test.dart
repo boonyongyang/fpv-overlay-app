@@ -9,7 +9,7 @@ import 'package:fpv_overlay_app/infrastructure/services/http_update_service.dart
 
 void main() {
   group('HttpUpdateService', () {
-    http.Response _manifest(String version) => http.Response(
+    http.Response manifest(String version) => http.Response(
           jsonEncode({
             'version': version,
             'release_url':
@@ -20,7 +20,7 @@ void main() {
         );
 
     test('returns UpdateInfo when remote version is newer', () async {
-      final client = MockClient((_) async => _manifest('1.1.0'));
+      final client = MockClient((_) async => manifest('1.1.0'));
       final service = HttpUpdateService(client: client);
       final result = await service.checkForUpdate('1.0.0');
       expect(result, isNotNull);
@@ -30,14 +30,14 @@ void main() {
     });
 
     test('returns null when remote version equals current', () async {
-      final client = MockClient((_) async => _manifest('1.0.0'));
+      final client = MockClient((_) async => manifest('1.0.0'));
       final service = HttpUpdateService(client: client);
       final result = await service.checkForUpdate('1.0.0');
       expect(result, isNull);
     });
 
     test('returns null when remote version is older', () async {
-      final client = MockClient((_) async => _manifest('0.9.0'));
+      final client = MockClient((_) async => manifest('0.9.0'));
       final service = HttpUpdateService(client: client);
       final result = await service.checkForUpdate('1.0.0');
       expect(result, isNull);
@@ -67,7 +67,7 @@ void main() {
     });
 
     test('detects minor version bump as newer', () async {
-      final client = MockClient((_) async => _manifest('1.2.0'));
+      final client = MockClient((_) async => manifest('1.2.0'));
       final service = HttpUpdateService(client: client);
       final result = await service.checkForUpdate('1.1.5');
       expect(result, isNotNull);
@@ -75,7 +75,7 @@ void main() {
     });
 
     test('detects major version bump as newer', () async {
-      final client = MockClient((_) async => _manifest('2.0.0'));
+      final client = MockClient((_) async => manifest('2.0.0'));
       final service = HttpUpdateService(client: client);
       final result = await service.checkForUpdate('1.9.9');
       expect(result, isNotNull);
