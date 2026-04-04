@@ -55,6 +55,7 @@ fi
 
 if [[ -n "$TAG" ]]; then
     TAG_VERSION="${TAG#v}"
+    TAG_VERSION="${TAG_VERSION%%-*}"
     if [[ "$TAG_VERSION" != "$CLI_VERSION" ]]; then
         echo "Release tag does not match CLI version:" >&2
         echo "  tag: $TAG" >&2

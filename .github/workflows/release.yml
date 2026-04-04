@@ -49,8 +49,10 @@ jobs:
         shell: bash
         run: |
           PUBSPEC_VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
-          if [[ "$PUBSPEC_VERSION" != "${{ steps.meta.outputs.version }}" ]]; then
-            echo "pubspec.yaml version ($PUBSPEC_VERSION) does not match tag (${{ steps.meta.outputs.version }})" >&2
+          TAG_BASE_VERSION="${{ steps.meta.outputs.version }}"
+          TAG_BASE_VERSION="${TAG_BASE_VERSION%%-*}"
+          if [[ "$PUBSPEC_VERSION" != "$TAG_BASE_VERSION" ]]; then
+            echo "pubspec.yaml version ($PUBSPEC_VERSION) does not match tag base ($TAG_BASE_VERSION)" >&2
             exit 1
           fi
 
