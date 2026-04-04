@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:overlay_core/overlay_core.dart' show OverlayRuntime;
 import 'package:fpv_overlay_app/application/providers/local_stats_provider.dart';
 import 'package:fpv_overlay_app/application/providers/task_queue_provider.dart';
 import 'package:fpv_overlay_app/domain/models/app_configuration.dart';
@@ -20,10 +21,13 @@ class _FakeOverlayTask extends Fake implements OverlayTask {}
 
 class _FakeAppConfiguration extends Fake implements AppConfiguration {}
 
+class _FakeOverlayRuntime extends Fake implements OverlayRuntime {}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(_FakeOverlayTask());
     registerFallbackValue(_FakeAppConfiguration());
+    registerFallbackValue(_FakeOverlayRuntime());
   });
   late TaskQueueProvider provider;
   late MockEngineService mockEngine;

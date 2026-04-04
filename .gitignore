@@ -11,6 +11,9 @@ __pycache__/
 .svn/
 migrate_working_dir/
 
+# Claude Code
+.claude/
+
 # IntelliJ related
 *.iml
 *.ipr
@@ -50,6 +53,8 @@ app.*.map.json
 /build
 dist/
 build/downloads/
+build/cli-release/
+build/cli-runtime/
 build/macos-runtime/
 build/windows-downloads/
 build/windows-runtime/

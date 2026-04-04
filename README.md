@@ -1,63 +1,93 @@
-# FPV Overlay Toolbox
+# FPV Overlay Toolbox [![CI](https://github.com/boonyongyang/fpv-overlay-app/actions/workflows/ci.yml/badge.svg)](https://github.com/boonyongyang/fpv-overlay-app/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-FPV Overlay Toolbox is a Flutter desktop app for turning flight footage plus telemetry into finished FPV overlay videos.
+FPV Overlay Toolbox is a Flutter desktop app for turning flight footage plus telemetry into finished FPV overlay videos on macOS and Windows.
 
-It supports:
+It is built as a real utility first, and as a portfolio-quality Flutter desktop codebase second: queue-driven workflows, local-only diagnostics, platform-aware UX, and packaging/release automation all live in the same repo.
 
-- fast subtitle overlays from `.srt`
-- full graphical overlays from `.osd`
-- combined `.osd` + `.srt` renders in one output
-- DJI split-recording flows where a later clip reuses the earlier segment's `.osd`
-
-The project is published as a source-first open-source desktop app. The main value is the utility itself, and the codebase is intentionally structured to also showcase professional Flutter desktop product work: layered app architecture, queue state management, diagnostics, packaging scripts, and platform-aware UX.
-
-## Desktop UX Highlights
-
-- **Command palette** with `Cmd/Ctrl + K` for queue actions, navigation, diagnostics, and the workflow tour
-- **Controllable queue workspace** with search, status filters, overlay-type filters, and sort modes
-- **Focused task log view** for renderer output, failure traces, and copyable diagnostics
-- **First-run onboarding** plus a reusable workflow tour
-- **Local runtime diagnostics** for FFmpeg, Python, output strategy, and overlay assets
-- **Desktop-native behavior** including drag-and-drop, notifications, macOS dock progress, and Windows taskbar progress
-
-## What Problem It Solves
+## Why This Exists
 
 Most FPV overlay workflows are still fragmented:
 
 - subtitle overlays are quick but visually limited
-- full OSD overlays are often tied to scripts or one-off tooling
+- full OSD overlays often depend on scripts or manual setup
 - long DJI recordings complicate clip-to-telemetry matching
-- sharing a working setup usually means explaining FFmpeg, Python, and asset dependencies by hand
+- sharing a working setup usually means walking someone through FFmpeg, Python, and asset dependencies by hand
 
-FPV Overlay Toolbox wraps that into a desktop workflow with one queue, one diagnostics surface, and one product shell.
+FPV Overlay Toolbox wraps that into one desktop workflow with one queue, one diagnostics surface, and one product shell.
 
-## How The Workflow Works
+## What It Does
+
+- fast subtitle overlays from `.srt`
+- full graphical overlays from `.osd`
+- combined `.osd` + `.srt` renders in one output
+- DJI split-recording recovery where a later clip can reuse an earlier `.osd`
+- overview-first queue management with clear-all actions and render activity views
+- local diagnostics for FFmpeg, Python, output strategy, and bundled overlay assets
+- desktop-native behavior including drag-and-drop, notifications, macOS dock progress, and Windows taskbar progress
+
+## Install / Download
+
+Release builds are published through [GitHub Releases](https://github.com/boonyongyang/fpv-overlay-app/releases).
+
+- macOS: download the latest `.dmg`
+- Windows: download the latest installer `.exe`
+- Until the first public release is attached, run from source with the steps below
+
+### Run From Source
+
+The repo pins Flutter with [`.fvmrc`](.fvmrc).
+
+```bash
+fvm flutter pub get
+fvm flutter run -d macos
+```
+
+Useful local commands:
+
+```bash
+make pub-get
+make bootstrap
+make analyze
+make test
+make build-macos-release
+make package-macos-runtime
+make dmg
+```
+
+Windows packaging must be run on Windows:
+
+```powershell
+make build-windows-release
+make package-windows-runtime
+make windows-installer
+```
+
+## Supported Scope
+
+- Public support target: desktop
+- macOS: primary release path
+- Windows: packaged installer path
+- Linux: not currently a published target
+- Mobile folders may exist in the tree, but the public product focus is desktop
+
+## Workflow
 
 1. Add mixed video and telemetry files, or scan a folder.
 2. The matching engine pairs files by stem and keeps incomplete tasks visible instead of discarding them.
 3. If a later DJI split clip has no exact `.osd`, the queue can reuse the nearest preceding `.osd`.
-4. Review queue items, open task logs when needed, then start the batch render.
+4. Review queue items, start the batch render, and open the render activity view only when deeper execution detail is needed.
 5. Copy a diagnostics report at any point if the environment or a specific task needs investigation.
 
-## Architecture At A Glance
+## Architecture
 
-The repo keeps a clear layered structure:
+The repo uses a layered Flutter desktop structure:
 
-- `presentation/` for the desktop UI, onboarding, command palette, and task log views
-- `application/` for ChangeNotifier-driven workspace, settings, navigation, and queue state
-- `domain/` for task models, failure classification, and command interfaces
-- `infrastructure/` for file matching, storage, platform services, and subprocess orchestration
+- `presentation/` for the desktop shell, onboarding, command palette, activity views, and navigation
+- `application/` for queue state, settings state, navigation state, and workspace actions
+- `domain/` for task models, failure parsing, and render command contracts
+- `infrastructure/` for matching, persistence, subprocess orchestration, and platform services
 
-Key implementation decisions:
-
-- **Flutter owns the desktop product shell**  
-  Queue UX, diagnostics, state transitions, onboarding, and desktop presentation are all handled in Flutter.
-
-- **Renderer logic stays isolated**  
-  Python + FFmpeg are still the right fit for the OSD rendering path, but they live behind command abstractions so the UI layer stays clean.
-
-- **Source-first local product posture**  
-  Overlay stats, queue diagnostics, and media processing remain local to the device. This repo does not ship analytics or cloud reporting.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the deeper system breakdown, queue lifecycle, render pipeline, and release surfaces.
 
 ## Privacy / Local-Only Posture
 
@@ -86,55 +116,17 @@ The canonical sample pack includes:
 - `DJIG0025.mp4`
 - `DJIG0025.srt`
 
-That pack exercises the important split-recording case where clip `25` reuses the earlier `.osd` timeline.
+That pack exercises the split-recording case where clip `25` reuses the earlier `.osd` timeline.
 
-## Development
+## Maintainer Docs
 
-The repo pins Flutter with [`.fvmrc`](.fvmrc).
-
-Install dependencies:
-
-```bash
-fvm flutter pub get
-```
-
-Run the app locally:
-
-```bash
-fvm flutter run -d macos
-```
-
-Useful commands:
-
-```bash
-make pub-get
-make bootstrap
-make analyze
-make test
-make build-macos-release
-make package-macos-runtime
-make dmg
-```
-
-Windows packaging must be run on Windows:
-
-```powershell
-make build-windows-release
-make package-windows-runtime
-make windows-installer
-```
-
-## Packaging Scripts
-
-The repo includes desktop packaging scripts and runtime bundling helpers, including:
-
-- [tools/prepare_macos_app_runtime.sh](tools/prepare_macos_app_runtime.sh)
-- [tools/create_dmg.sh](tools/create_dmg.sh)
-- [tools/build_windows_overlay_runtime.ps1](tools/build_windows_overlay_runtime.ps1)
-- [tools/prepare_windows_release.ps1](tools/prepare_windows_release.ps1)
-- [tools/create_windows_installer.ps1](tools/create_windows_installer.ps1)
-
-This public pass focuses on a strong source codebase and desktop product UX. Packaging scripts are included, but this README does not claim fully validated public release artifacts.
+- architecture guide: [ARCHITECTURE.md](ARCHITECTURE.md)
+- release checklist: [docs/github_release_checklist.md](docs/github_release_checklist.md)
+- maintainer release checklist: [docs/maintainer_release_checklist.md](docs/maintainer_release_checklist.md)
+- macOS app update notes: [docs/macos_app_updates.md](docs/macos_app_updates.md)
+- unified release workflow: [.github/workflows/release.yml](.github/workflows/release.yml)
+- CLI release notes: [docs/cli_release.md](docs/cli_release.md)
+- third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 ## Contributing
 
@@ -142,7 +134,7 @@ Start with:
 
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- [ARCHITECTURE.md](ARCHITECTURE.md)
 
 The most useful contribution areas right now are queue workflow improvements, better diagnostics, media-path edge cases, and packaging polish.
 

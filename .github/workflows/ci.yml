@@ -15,16 +15,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup FVM
-        uses: leoafarias/fvm-action@v1
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.24.4'
           cache: true
 
       - name: Install Flutter dependencies
-        run: fvm flutter pub get
+        run: flutter pub get
 
-      - name: Analyze
-        run: fvm flutter analyze
+      - name: Install CLI dependencies
+        run: cd cli && dart pub get
 
-      - name: Test
-        run: fvm flutter test
+      - name: Install shared core dependencies
+        run: cd packages/overlay_core && dart pub get
+
+      - name: Validate CLI release metadata
+        run: |
+          chmod +x tools/verify_cli_release_metadata.sh
+          tools/verify_cli_release_metadata.sh
+
+      - name: Analyze Flutter app
+        run: flutter analyze
+
+      - name: Analyze CLI
+        run: cd cli && dart analyze
+
+      - name: Analyze shared core
+        run: cd packages/overlay_core && dart analyze
+
+      - name: Test Flutter app
+        run: flutter test
+
+      - name: Test shared core
+        run: cd packages/overlay_core && dart test
+
+      - name: Smoke test CLI dry runs
+        run: |
+          tmpdir="$(mktemp -d)"
+          touch "$tmpdir/clip.mp4"
+          printf 'srt' >"$tmpdir/clip.srt"
+          (cd cli && dart run bin/fpv_overlay.dart render --video "$tmpdir/clip.mp4" --srt "$tmpdir/clip.srt" --dry-run)
+          (cd cli && dart run bin/fpv_overlay.dart batch --input-dir "$tmpdir" --dry-run)

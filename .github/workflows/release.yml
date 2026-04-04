@@ -84,13 +84,14 @@ jobs:
           echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
           echo "checksum_name=$CHECKSUM_NAME"  >> "$GITHUB_OUTPUT"
 
-      - name: Setup FVM
-        uses: leoafarias/fvm-action@v1
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.24.4'
           cache: true
 
       - name: Install Flutter dependencies
-        run: fvm flutter pub get
+        run: flutter pub get
 
       - name: Ensure CocoaPods is available
         run: |
@@ -109,7 +110,7 @@ jobs:
             tools/create_dmg.sh
 
       - name: Build macOS app
-        run: fvm flutter build macos --release
+        run: flutter build macos --release
 
       - name: Package DMG
         run: tools/create_dmg.sh
@@ -148,19 +149,20 @@ jobs:
         with:
           ref: ${{ needs.validate.outputs.ref }}
 
-      - name: Setup FVM
-        uses: leoafarias/fvm-action@v1
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.24.4'
           cache: true
 
       - name: Install Flutter dependencies
-        run: fvm flutter pub get
+        run: flutter pub get
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
 
       - name: Build Windows app
-        run: fvm flutter build windows --release
+        run: flutter build windows --release
 
       - name: Package Windows installer
         shell: pwsh
@@ -187,9 +189,10 @@ jobs:
         with:
           ref: ${{ needs.validate.outputs.ref }}
 
-      - name: Setup FVM
-        uses: leoafarias/fvm-action@v1
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.24.4'
           cache: true
 
       - name: Prepare build scripts
@@ -238,9 +241,10 @@ jobs:
         with:
           ref: ${{ needs.validate.outputs.ref }}
 
-      - name: Setup FVM
-        uses: leoafarias/fvm-action@v1
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.24.4'
           cache: true
 
       - name: Prepare build scripts

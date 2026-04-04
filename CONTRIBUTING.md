@@ -6,6 +6,7 @@
 - Keep queue logic, shell/workspace state, and platform/runtime concerns separated.
 - Preserve the local-only product posture. Do not introduce analytics or cloud behavior casually.
 - When changing packaging scripts or runtime resolution, document the change in the relevant script comments or README section.
+- Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing queue flow, render orchestration, or release packaging.
 
 ## Setup
 

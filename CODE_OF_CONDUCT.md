@@ -20,4 +20,4 @@ Project maintainers may remove comments, close discussions, or block contributor
 
 ## Reporting
 
-Open a private maintainer contact route before public launch, or use the repository issue tracker for non-sensitive conduct concerns.
+For private conduct reports, use the contact route exposed on the maintainer's GitHub profile once the repository is public. Use the repository issue tracker only for non-sensitive conduct concerns.

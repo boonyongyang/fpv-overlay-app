@@ -12,6 +12,7 @@ Toolbox.
 - [x] Move large sample media out of the normal git clone path
       Source repo now keeps only `samples/manifest.json` plus notes
 - [ ] Attach a real release tag and upload the desktop artifacts
+- [x] If publishing the CLI, bump `cli/pubspec.yaml` and use a matching `v*` tag
 
 ## Repo presentation
 
@@ -28,6 +29,10 @@ Toolbox.
 - [ ] Verify the bundled runtime exists inside the macOS `.app`
 - [ ] Verify the Windows installer includes the runtime payload
 - [ ] Smoke-test the `DJIG0024` / `DJIG0025` split-recording sample pair
+- [ ] Verify CLI artifact names:
+      - `fpv-overlay-cli-macos-arm64-<version>.tar.gz`
+      - `fpv-overlay-cli-macos-x64-<version>.tar.gz`
+- [ ] Run a clean-machine `brew install boonyongyang/tap/fpv-overlay` smoke test once the tap is updated
 
 ## Packaging and signing
 
@@ -47,6 +52,7 @@ Toolbox.
 
 ## Nice-to-have follow-up
 
-- [ ] Add GitHub Actions for tagged release builds
+- [x] Add GitHub Actions for tagged release builds
+      The unified release flow now lives in `.github/workflows/release.yml`
 - [ ] Add recursive folder scanning
 - [ ] Add a lightweight sample pack specifically for source-repo regression tests
