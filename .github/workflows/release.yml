@@ -233,7 +233,7 @@ jobs:
   build-cli-x64:
     name: Build CLI (macOS x64)
     needs: validate
-    runs-on: macos-13
+    runs-on: macos-14
     outputs:
       sha256: ${{ steps.checksum.outputs.sha256 }}
 
@@ -249,6 +249,9 @@ jobs:
           flutter-version: '3.24.4'
           cache: true
 
+      - name: Install Rosetta
+        run: softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
+
       - name: Prepare build scripts
         run: |
           chmod +x \
@@ -258,8 +261,8 @@ jobs:
             tools/render_homebrew_formula.sh \
             tools/verify_cli_release_metadata.sh
 
-      - name: Build CLI release archive
-        run: make build-cli-release-macos
+      - name: Build CLI release archive (x64 via Rosetta)
+        run: arch -x86_64 make build-cli-release-macos
 
       - name: Compute checksum
         id: checksum
