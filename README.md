@@ -29,9 +29,23 @@ FPV Overlay Toolbox wraps that into one desktop workflow with one queue, one dia
 
 Release builds are published through [GitHub Releases](https://github.com/boonyongyang/fpv-overlay-app/releases).
 
-- macOS: download the latest `.dmg`
-- Windows: download the latest installer `.exe`
-- Until the first public release is attached, run from source with the steps below
+### macOS
+
+Download the latest `.dmg` from Releases, mount it, and drag the app to `/Applications`.
+
+> **First launch:** The app is ad-hoc signed. macOS may show a Gatekeeper prompt on first open. Right-click the app → **Open** to bypass it. You only need to do this once.
+
+### Windows
+
+Download the latest `-setup.exe` from Releases and run it. Windows SmartScreen may show a warning on first run — click **More info → Run anyway**.
+
+### CLI (macOS)
+
+```bash
+brew install boonyongyang/tap/fpv-overlay
+```
+
+Or download a `.tar.gz` archive directly from Releases.
 
 ### Run From Source
 
