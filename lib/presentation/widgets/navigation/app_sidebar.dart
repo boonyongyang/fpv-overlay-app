@@ -49,7 +49,6 @@ class AppSidebar extends StatelessWidget {
             theme: theme,
             compact: compact,
             collapsed: collapsed,
-            onToggleCollapsed: onToggleCollapsed,
           ),
           SizedBox(height: collapsed ? 12 : (compact ? 10 : 16)),
           SidebarItem(
@@ -75,6 +74,11 @@ class AppSidebar extends StatelessWidget {
             compact: compact,
             collapsed: collapsed,
           ),
+          if (onToggleCollapsed != null)
+            _SidebarCollapseButton(
+              collapsed: collapsed,
+              onToggle: onToggleCollapsed!,
+            ),
         ],
       ),
     );
@@ -85,48 +89,21 @@ class _SidebarHeader extends StatelessWidget {
   final ThemeData theme;
   final bool compact;
   final bool collapsed;
-  final VoidCallback? onToggleCollapsed;
 
   const _SidebarHeader({
     required this.theme,
     required this.compact,
     required this.collapsed,
-    required this.onToggleCollapsed,
   });
 
   @override
   Widget build(BuildContext context) {
-    final button = onToggleCollapsed == null
-        ? null
-        : Tooltip(
-            message: collapsed ? 'Expand sidebar' : 'Collapse sidebar',
-            child: IconButton(
-              onPressed: onToggleCollapsed,
-              icon: Icon(
-                collapsed
-                    ? Icons.chevron_right_rounded
-                    : Icons.chevron_left_rounded,
-              ),
-              style: IconButton.styleFrom(
-                backgroundColor:
-                    theme.colorScheme.surfaceContainerHighest.withAlpha(100),
-                foregroundColor: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          );
-
     if (collapsed) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Column(
-          children: [
-            if (button != null) button,
-            const SizedBox(height: 14),
-            const Tooltip(
-              message: AppIdentity.name,
-              child: FpvLogo(size: 28, color: Colors.cyanAccent),
-            ),
-          ],
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 12),
+        child: Tooltip(
+          message: AppIdentity.name,
+          child: FpvLogo(size: 28, color: Colors.cyanAccent),
         ),
       );
     }
@@ -140,31 +117,20 @@ class _SidebarHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              FpvLogo(size: compact ? 28 : 32, color: Colors.cyanAccent),
+              SizedBox(width: compact ? 10 : 12),
               Expanded(
-                child: Row(
-                  children: [
-                    FpvLogo(size: compact ? 28 : 32, color: Colors.cyanAccent),
-                    SizedBox(width: compact ? 10 : 12),
-                    Expanded(
-                      child: Text(
-                        AppIdentity.name,
-                        maxLines: 2,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                          height: 1.05,
-                        ),
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  AppIdentity.name,
+                  maxLines: 2,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                    height: 1.05,
+                  ),
                 ),
               ),
-              if (button != null) ...[
-                const SizedBox(width: 8),
-                button,
-              ],
             ],
           ),
           const SizedBox(height: 4),
@@ -266,6 +232,47 @@ class _SidebarHelpButton extends StatelessWidget {
                       ),
                     ],
                   ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarCollapseButton extends StatelessWidget {
+  final bool collapsed;
+  final VoidCallback onToggle;
+
+  const _SidebarCollapseButton({
+    required this.collapsed,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Tooltip(
+      message: collapsed ? 'Expand sidebar' : 'Collapse sidebar',
+      preferBelow: false,
+      child: InkWell(
+        onTap: onToggle,
+        child: Container(
+          height: 36,
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: theme.colorScheme.outlineVariant.withAlpha(40),
+              ),
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              collapsed
+                  ? Icons.keyboard_double_arrow_right_rounded
+                  : Icons.keyboard_double_arrow_left_rounded,
+              size: 15,
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(120),
+            ),
           ),
         ),
       ),
