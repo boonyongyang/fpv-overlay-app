@@ -9,7 +9,7 @@ import 'runtime/cli_runtime.dart';
 
 const _cliVersion = String.fromEnvironment(
   'fpv_overlay_cli_version',
-  defaultValue: '1.0.0',
+  defaultValue: '1.0.1',
 );
 
 Future<int> runCli(List<String> args) async {
