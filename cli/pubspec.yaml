@@ -1,6 +1,6 @@
 name: fpv_overlay_cli
 description: Terminal interface for FPV Overlay Toolbox.
-version: 1.0.1
+version: 1.0.2
 publish_to: 'none'
 
 environment:
