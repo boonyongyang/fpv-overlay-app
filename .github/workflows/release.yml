@@ -40,7 +40,7 @@ jobs:
           echo "ref=refs/tags/$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           ref: ${{ steps.meta.outputs.ref }}
           fetch-depth: 0
@@ -73,7 +73,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           ref: ${{ needs.validate.outputs.ref }}
 
@@ -115,7 +115,7 @@ jobs:
         run: flutter build macos --release
 
       - name: Package DMG
-        run: tools/create_dmg.sh
+        run: tools/create_dmg.sh "" "${{ needs.validate.outputs.version }}"
 
       - name: Compute checksum
         id: checksum
@@ -131,7 +131,7 @@ jobs:
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
 
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: macos-dmg
           path: |
@@ -147,7 +147,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           ref: ${{ needs.validate.outputs.ref }}
 
@@ -171,7 +171,7 @@ jobs:
         run: .\tools\create_windows_installer.ps1
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: windows-installer
           path: dist/windows/*-setup.exe
@@ -187,7 +187,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           ref: ${{ needs.validate.outputs.ref }}
 
@@ -221,7 +221,7 @@ jobs:
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
 
       - name: Upload CLI arm64 artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: cli-arm64
           path: |
@@ -239,7 +239,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           ref: ${{ needs.validate.outputs.ref }}
 
@@ -276,7 +276,7 @@ jobs:
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
 
       - name: Upload CLI x64 artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: cli-x64
           path: |
@@ -306,12 +306,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           ref: ${{ needs.validate.outputs.ref }}
 
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.3.0
         with:
           path: build/release-assets
 
