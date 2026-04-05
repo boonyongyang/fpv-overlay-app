@@ -30,6 +30,12 @@ jobs:
       - name: Install shared core dependencies
         run: cd packages/overlay_core && dart pub get
 
+      - name: Check formatting
+        run: |
+          dart format --output=none --set-exit-if-changed lib test
+          dart format --output=none --set-exit-if-changed cli/lib cli/bin
+          dart format --output=none --set-exit-if-changed packages/overlay_core/lib packages/overlay_core/test
+
       - name: Validate CLI release metadata
         run: |
           chmod +x tools/verify_cli_release_metadata.sh
