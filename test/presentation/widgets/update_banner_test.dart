@@ -14,6 +14,9 @@ const _info = UpdateInfo(
   version: '1.1.0',
   releaseUrl: 'https://github.com/example/releases/tag/v1.1.0',
   publishedAt: '2026-03-27T00:00:00Z',
+  artifactUrl:
+      'https://github.com/example/releases/download/v1.1.0/fpv-overlay-toolbox-macos-1.1.0.dmg',
+  sha256: 'abc123',
 );
 
 Widget _wrap(UpdateProvider provider) =>

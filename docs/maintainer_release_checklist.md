@@ -1,36 +1,23 @@
 # Maintainer Release Checklist
 
-Everything below still requires a human decision, a real machine validation step,
-or a GitHub-side action.
+The automated steps live in `CLAUDE.md → Release Procedure`. This file covers
+decisions and machine-level validations that cannot be automated.
 
 ---
 
-## 1. Push to GitHub
+## 1. Push to GitHub ✅ Done
 
-No remote is configured yet. Create the repo on GitHub, then:
+Repo is live at https://github.com/boonyongyang/fpv-overlay-app
 
-```bash
-git remote add origin https://github.com/<your-username>/fpv-overlay-app.git
-git push -u origin main
-```
+CI runs on every push to `main`. Release workflow runs on every `v*` tag push.
 
-Once pushed, the CI workflow (`.github/workflows/ci.yml`) will run automatically
-on future pushes, and the unified release workflow (`.github/workflows/release.yml`)
-will be available in Actions.
-
-For the macOS update workflow, also check:
-
-- GitHub repo → Settings → Actions → General
-- Workflow permissions → **Read and write permissions**
-
-That workflow creates GitHub releases and uploads update assets, so read-only
-token permissions are not enough.
+Workflow write permissions are set (required for release creation and asset upload).
 
 ---
 
-## 2. Add README Screenshots
+## 2. Add README Screenshots (pending)
 
-The README has no visuals. Add 3–6 screenshots or short GIFs showing:
+The README has no visuals yet. Add 3–6 screenshots or short GIFs showing:
 
 - The queue workspace (empty state + populated)
 - A task card (completed, failed, or missing-telemetry state)
@@ -42,14 +29,10 @@ Put them in `docs/screenshots/` and reference them from README.md.
 
 ---
 
-## 3. Verify README Links
+## 3. Verify README Links ✅ Done
 
-Check that these match your actual GitHub repo:
-- `AppIdentity.repositoryUrl` in `lib/core/constants/app_identity.dart` — currently `https://github.com/boonyongyang/fpv-overlay-app`
-- `AppIdentity.releasesUrl` — same repo `/releases`
-- All links in README.md, CONTRIBUTING.md, and CODE_OF_CONDUCT.md
-
-Update `AppIdentity` constants if your repo slug differs.
+`AppIdentity` constants in `lib/core/constants/app_identity.dart` point to the correct repo.
+All README, CONTRIBUTING, and CODE_OF_CONDUCT links verified.
 
 ---
 
@@ -104,22 +87,21 @@ The raw sample files (`DJIG0024.mp4`, `.osd`, `.srt`, `DJIG0025.mp4`, `.srt`) ar
 
 ---
 
-## 7. Tag and Publish v1.0.0
+## 7. Tag and Publish
 
-Once the DMG and EXE are validated:
+Once the DMG and EXE are validated on clean machines:
 
 ```bash
-# Clean up before tagging
-rm -rf build/ dist/ .venv-media/ .venv-packaging/ .venv-packaging-windows/
-
-git tag -a v1.0.0 -m "v1.0.0"
-git push origin v1.0.0
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin vX.Y.Z
 ```
 
-Then on GitHub → Releases → create a new release from the tag and upload:
-- `fpv-overlay-toolbox-macos-1.0.0.dmg`
-- `fpv-overlay-toolbox-windows-1.0.0-setup.exe`
-- (optional) sample pack archive
+The release workflow will automatically:
+- Build macOS DMG + Windows EXE + CLI arm64/x64
+- Create the GitHub release with auto-generated notes
+- Upload all artifacts + `latest-macos.json` + Homebrew formula
+
+> Note: `build/` and `dist/` are in `.gitignore` — no manual cleanup needed before tagging.
 
 ---
 

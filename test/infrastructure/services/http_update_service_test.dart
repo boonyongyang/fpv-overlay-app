@@ -14,6 +14,9 @@ void main() {
             'version': version,
             'release_url': 'https://github.com/example/releases/tag/v$version',
             'published_at': '2026-03-27T00:00:00Z',
+            'artifact_url':
+                'https://github.com/example/releases/download/v$version/fpv-overlay-toolbox-macos-$version.dmg',
+            'sha256': 'abc123',
           }),
           200,
         );

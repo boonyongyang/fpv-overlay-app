@@ -26,11 +26,15 @@ class HttpUpdateService implements UpdateService {
       final remoteVersion = json['version'] as String;
       final releaseUrl = json['release_url'] as String;
       final publishedAt = json['published_at'] as String;
+      final artifactUrl = json['artifact_url'] as String;
+      final sha256 = json['sha256'] as String;
       if (!_isNewer(remoteVersion, currentVersion)) return null;
       return UpdateInfo(
         version: remoteVersion,
         releaseUrl: releaseUrl,
         publishedAt: publishedAt,
+        artifactUrl: artifactUrl,
+        sha256: sha256,
       );
     } catch (_) {
       return null;

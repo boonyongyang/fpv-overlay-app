@@ -101,3 +101,70 @@ Key test files:
 - `test/application/providers/task_queue_provider_test.dart`
 - `test/infrastructure/services/engine_service_test.dart`
 - `test/domain/task_failure_parser_test.dart`
+
+## Release Procedure
+
+Follow this checklist **every time** a new version is released. Do not skip steps.
+
+### Step 1 — Pre-release checks (automated)
+
+```bash
+make check           # analyzer + all tests must pass
+dart format --output=none --set-exit-if-changed lib test cli/lib cli/bin packages/overlay_core/lib packages/overlay_core/test
+chmod +x tools/verify_cli_release_metadata.sh && tools/verify_cli_release_metadata.sh --tag vX.Y.Z
+```
+
+### Step 2 — Version bump (when bumping versions)
+
+- `pubspec.yaml` → `version: X.Y.Z+BUILD`
+- `cli/pubspec.yaml` → `version: X.Y.Z`
+- `cli/lib/src/app.dart` → `defaultValue: 'X.Y.Z'`
+- All three must match the release tag base version
+
+### Step 3 — Commit and push
+
+```bash
+git add -p   # stage only what belongs to the release
+git commit -m "chore: release vX.Y.Z"
+git push origin main
+```
+
+### Step 4 — Build local macOS DMG
+
+```bash
+make release   # runs: check → build → package-macos-runtime → dmg
+# Outputs: dist/fpv-overlay-toolbox-macos-X.Y.Z.dmg
+```
+
+Update `dist/` by replacing the old DMG. The new DMG is the local install artifact.
+
+### Step 5 — Tag and push (triggers CI release workflow)
+
+```bash
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+This triggers `.github/workflows/release.yml` which:
+- Builds macOS DMG + Windows EXE + CLI arm64/x64
+- Creates the GitHub release
+- Uploads all artifacts + `latest-macos.json` + Homebrew formula
+
+### Step 6 — Verify GitHub Actions
+
+```bash
+gh run list --limit 5   # confirm release workflow is running/passed
+gh release view vX.Y.Z  # confirm all artifacts uploaded
+```
+
+### Step 7 — Update checklists
+
+Mark completed items in:
+- `docs/github_release_checklist.md`
+- `docs/maintainer_release_checklist.md`
+
+### Human-only tasks (cannot be automated)
+
+- Test the DMG on a clean machine
+- Test the Windows EXE on a Windows machine
+- Add/update README screenshots in `docs/screenshots/`

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:fpv_overlay_app/application/providers/local_stats_provider.dart';
 import 'package:fpv_overlay_app/application/providers/settings_provider.dart';
 import 'package:fpv_overlay_app/application/providers/task_queue_provider.dart';
+import 'package:fpv_overlay_app/application/providers/update_provider.dart';
+import 'package:fpv_overlay_app/core/constants/app_identity.dart';
 import 'package:fpv_overlay_app/core/utils/platform_utils.dart';
 import 'package:fpv_overlay_app/domain/models/app_configuration.dart';
 import 'package:fpv_overlay_app/domain/models/local_overlay_stats.dart';
@@ -75,6 +78,12 @@ class SettingsPage extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 32),
+          const _Section(
+            title: 'App Updates',
+            icon: Icons.system_update_alt_rounded,
+            children: [_AppUpdatesPanel()],
           ),
           const SizedBox(height: 32),
           _Section(
@@ -272,6 +281,211 @@ class SettingsPage extends StatelessWidget {
     if (confirmed == true) {
       await settingsProvider.resetConfig();
     }
+  }
+}
+
+class _AppUpdatesPanel extends StatelessWidget {
+  const _AppUpdatesPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final update = context.watch<UpdateProvider>();
+
+    if (!Platform.isMacOS) {
+      return _Panel(
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    update.resolvedVersion != null
+                        ? 'Version ${update.resolvedVersion}'
+                        : 'FPV Overlay Toolbox',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Auto-update is only available on macOS.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () =>
+                  unawaited(PlatformUtils.openUrl(AppIdentity.releasesUrl)),
+              icon: const Icon(Icons.open_in_new_rounded, size: 16),
+              label: const Text('View Releases'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // macOS update panel
+    return _Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      update.resolvedVersion != null
+                          ? 'Version ${update.resolvedVersion}'
+                          : 'FPV Overlay Toolbox',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (update.statusMessage != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        update.statusMessage!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (!update.isDownloading && !update.readyToInstall)
+                _buildCheckOrUpdateButtons(context, update),
+            ],
+          ),
+          if (update.isDownloading) ...[
+            const SizedBox(height: 16),
+            _buildDownloadProgress(context, update),
+          ],
+          if (update.readyToInstall) ...[
+            const SizedBox(height: 16),
+            _buildReadyToInstall(context, update),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckOrUpdateButtons(
+    BuildContext context,
+    UpdateProvider update,
+  ) {
+    if (update.isChecking) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'Checking...',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      );
+    }
+
+    if (update.hasUpdate) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextButton(
+            onPressed: () => unawaited(
+              PlatformUtils.openUrl(update.availableUpdate!.releaseUrl),
+            ),
+            child: const Text('View Release'),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: () => unawaited(update.startDownload()),
+            icon: const Icon(Icons.download_rounded, size: 16),
+            label: Text('Download v${update.availableUpdate!.version}'),
+          ),
+        ],
+      );
+    }
+
+    return OutlinedButton(
+      onPressed: () => unawaited(update.checkForUpdates()),
+      child: const Text('Check for Updates'),
+    );
+  }
+
+  Widget _buildDownloadProgress(BuildContext context, UpdateProvider update) {
+    final theme = Theme.of(context);
+    final progress = update.downloadProgress;
+    final version = update.availableUpdate?.version ?? '';
+    final pct = progress != null ? ' · ${(progress * 100).round()}%' : '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Downloading v$version$pct',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: update.cancelDownload,
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        LinearProgressIndicator(value: progress),
+      ],
+    );
+  }
+
+  Widget _buildReadyToInstall(BuildContext context, UpdateProvider update) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'v${update.availableUpdate?.version ?? ''} downloaded',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: () => unawaited(update.openInstaller()),
+              icon: const Icon(Icons.open_in_new_rounded, size: 16),
+              label: const Text('Open Installer'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Drag the app to Applications to complete the update.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
   }
 }
 

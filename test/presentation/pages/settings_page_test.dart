@@ -7,8 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fpv_overlay_app/application/providers/local_stats_provider.dart';
 import 'package:fpv_overlay_app/application/providers/settings_provider.dart';
 import 'package:fpv_overlay_app/application/providers/task_queue_provider.dart';
+import 'package:fpv_overlay_app/application/providers/update_provider.dart';
 import 'package:fpv_overlay_app/domain/models/overlay_task.dart';
 import 'package:fpv_overlay_app/domain/services/os_service.dart';
+import 'package:fpv_overlay_app/domain/services/update_service.dart';
 import 'package:fpv_overlay_app/infrastructure/services/command_runner_service.dart';
 import 'package:fpv_overlay_app/infrastructure/services/engine_service.dart';
 import 'package:fpv_overlay_app/infrastructure/services/local_stats_service.dart';
@@ -22,10 +24,13 @@ class _MockCommandRunnerService extends Mock implements CommandRunnerService {}
 
 class _MockOsService extends Mock implements OsService {}
 
+class _MockUpdateService extends Mock implements UpdateService {}
+
 void main() {
   late SettingsProvider settingsProvider;
   late LocalStatsProvider statsProvider;
   late TaskQueueProvider queueProvider;
+  late UpdateProvider updateProvider;
 
   OverlayTask buildCompletedTask() {
     final task = OverlayTask(
@@ -55,6 +60,13 @@ void main() {
       osService: mockOs,
       localStatsProvider: statsProvider,
     );
+    final mockUpdateService = _MockUpdateService();
+    when(() => mockUpdateService.checkForUpdate(any()))
+        .thenAnswer((_) async => null);
+    updateProvider = UpdateProvider(
+      updateService: mockUpdateService,
+      currentVersion: '1.0.0',
+    );
     await settingsProvider.updateConfig(defaultOutputDirectory: '/out');
     await statsProvider.load();
     await statsProvider.recordRun(buildCompletedTask());
@@ -66,6 +78,7 @@ void main() {
         ChangeNotifierProvider<SettingsProvider>.value(value: settingsProvider),
         ChangeNotifierProvider<LocalStatsProvider>.value(value: statsProvider),
         ChangeNotifierProvider<TaskQueueProvider>.value(value: queueProvider),
+        ChangeNotifierProvider<UpdateProvider>.value(value: updateProvider),
         Provider<PickerService>(create: (_) => PickerService()),
       ],
       child: const MaterialApp(
