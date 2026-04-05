@@ -87,21 +87,23 @@ The raw sample files (`DJIG0024.mp4`, `.osd`, `.srt`, `DJIG0025.mp4`, `.srt`) ar
 
 ---
 
-## 7. Tag and Publish
+## 7. Tag and Publish ✅ Operational
 
-Once the DMG and EXE are validated on clean machines:
+Follow the full release procedure in `CLAUDE.md → Release Procedure`.
 
-```bash
-git tag -a vX.Y.Z -m "vX.Y.Z"
-git push origin vX.Y.Z
-```
+Quick summary:
 
-The release workflow will automatically:
-- Build macOS DMG + Windows EXE + CLI arm64/x64
-- Create the GitHub release with auto-generated notes
-- Upload all artifacts + `latest-macos.json` + Homebrew formula
+1. `make check` — all tests must pass
+2. Bump version in `pubspec.yaml`, `cli/pubspec.yaml`, `cli/lib/src/app.dart`
+3. Commit + push to `main`
+4. `make release` — builds local DMG in `dist/`
+5. `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`
+6. CI release workflow automatically builds macOS DMG + Windows EXE + CLI
+   arm64/x64, creates the GitHub release, and uploads all artifacts +
+   `latest-macos.json` + Homebrew formula.
+7. `gh run list --limit 5` to confirm the release workflow passed.
 
-> Note: `build/` and `dist/` are in `.gitignore` — no manual cleanup needed before tagging.
+> `build/` and `dist/` are in `.gitignore` — no manual cleanup needed before tagging.
 
 ---
 

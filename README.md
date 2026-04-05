@@ -24,6 +24,7 @@ FPV Overlay Toolbox wraps that into one desktop workflow with one queue, one dia
 - overview-first queue management with clear-all actions and render activity views
 - local diagnostics for FFmpeg, Python, output strategy, and bundled overlay assets
 - desktop-native behavior including drag-and-drop, notifications, macOS dock progress, and Windows taskbar progress
+- in-app update check with one-click **Install & Relaunch** on macOS (downloads DMG, verifies SHA256, replaces app bundle and relaunches automatically)
 
 ## Install / Download
 

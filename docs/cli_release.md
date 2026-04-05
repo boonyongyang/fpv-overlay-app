@@ -27,7 +27,7 @@ That script:
 You can also smoke-test a built bundle manually:
 
 ```bash
-make smoke-test-cli-bundle ARGS="--archive build/cli-release/fpv-overlay-cli-macos-arm64-1.0.0.tar.gz --version 1.0.0"
+make smoke-test-cli-bundle ARGS="--archive build/cli-release/fpv-overlay-cli-macos-arm64-<version>.tar.gz --version <version>"
 ```
 
 ## GitHub Actions Release Flow
@@ -45,11 +45,12 @@ Behavior:
 
 You can also run the workflow manually from the Actions tab to produce build artifacts without publishing a GitHub release.
 
-Before pushing a release tag:
+Before pushing a release tag follow the steps in `CLAUDE.md → Release Procedure`, which covers all three version files and the tag flow. Key CLI-specific pre-flight:
 
 1. bump `cli/pubspec.yaml` to the intended release version
-2. run `make verify-cli-release-metadata`
-3. push a matching tag such as `v1.0.0`
+2. bump `cli/lib/src/app.dart` `defaultValue` to match
+3. run `make verify-cli-release-metadata`
+4. push a matching tag such as `v1.0.3`
 
 The CI and release workflows now fail fast if the CLI version and the release tag drift.
 
