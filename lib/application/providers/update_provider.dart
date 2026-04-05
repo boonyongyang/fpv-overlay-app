@@ -158,9 +158,114 @@ class UpdateProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> openInstaller() async {
-    if (_downloadedPath == null) return;
-    await Process.run('open', [_downloadedPath!]);
+  /// Installs the downloaded update and relaunches the app.
+  ///
+  /// On macOS release builds: mounts the DMG silently, writes a detached
+  /// installer script that waits for this process to exit, copies the new
+  /// .app bundle over the existing one with `ditto`, relaunches, then
+  /// quits the current app.
+  ///
+  /// Falls back to opening the DMG manually if not running from a .app
+  /// bundle (e.g. in dev mode) or if `ditto` fails.
+  Future<void> installUpdate() async {
+    if (_downloadedPath == null || !Platform.isMacOS) return;
+
+    final bundlePath = _resolveAppBundlePath();
+    if (bundlePath == null) {
+      // Dev build — just open the DMG for manual drag-install.
+      await Process.run('open', [_downloadedPath!]);
+      return;
+    }
+
+    // Mount the DMG silently.
+    final attachResult = await Process.run('hdiutil', [
+      'attach',
+      _downloadedPath!,
+      '-nobrowse',
+      '-noverify',
+      '-noautoopen',
+    ]);
+
+    if (attachResult.exitCode != 0) {
+      _statusMessage = 'Failed to mount update package';
+      notifyListeners();
+      return;
+    }
+
+    // Parse the volume mount point (last tab-separated field of the last
+    // line that starts with /Volumes/).
+    String? volumePath;
+    for (final line in (attachResult.stdout as String).split('\n').reversed) {
+      final candidate = line.split('\t').last.trim();
+      if (candidate.startsWith('/Volumes/')) {
+        volumePath = candidate;
+        break;
+      }
+    }
+
+    if (volumePath == null) {
+      _statusMessage = 'Could not locate mounted volume';
+      notifyListeners();
+      return;
+    }
+
+    // Find the .app bundle inside the mounted volume.
+    final appInVolume = Directory(volumePath)
+        .listSync()
+        .whereType<Directory>()
+        .where((e) => e.path.endsWith('.app'))
+        .map((e) => e.path)
+        .firstOrNull;
+
+    if (appInVolume == null) {
+      await Process.run('hdiutil', ['detach', volumePath, '-quiet']);
+      _statusMessage = 'No app bundle found in update package';
+      notifyListeners();
+      return;
+    }
+
+    // Write a detached bash script.
+    // The script polls until this process exits, then installs and relaunches.
+    final currentPid = pid;
+    final dmgPath = _downloadedPath!;
+    final scriptPath = '/tmp/fpv_overlay_update_$currentPid.sh';
+
+    final script = '''#!/bin/bash
+# Wait for the old app to quit.
+while kill -0 $currentPid 2>/dev/null; do
+  sleep 0.3
+done
+sleep 0.3
+
+# Install the new version.
+if ditto "$appInVolume" "$bundlePath"; then
+  open "$bundlePath"
+  hdiutil detach "$volumePath" -quiet 2>/dev/null || true
+  rm -f "$dmgPath"
+else
+  # ditto failed — open the volume so the user can drag-install manually.
+  open "$volumePath"
+fi
+rm -f "$scriptPath"
+''';
+
+    await File(scriptPath).writeAsString(script);
+    await Process.run('chmod', ['+x', scriptPath]);
+
+    // Launch the script detached so it survives this process exiting.
+    await Process.start('bash', [scriptPath], mode: ProcessStartMode.detached);
+
+    // Quit the current app — the script will relaunch the new version.
+    exit(0);
+  }
+
+  /// Returns the current .app bundle root, or null when running outside a
+  /// bundle (e.g. during development).
+  String? _resolveAppBundlePath() {
+    final exe = Platform.resolvedExecutable;
+    if (!exe.contains('.app/Contents/MacOS')) return null;
+    // .../App.app/Contents/MacOS/exec → navigate up two levels.
+    return p.normalize(p.join(p.dirname(exe), '..', '..'));
   }
 
   void cancelDownload() {

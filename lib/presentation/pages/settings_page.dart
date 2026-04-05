@@ -471,15 +471,15 @@ class _AppUpdatesPanel extends StatelessWidget {
               ),
             ),
             FilledButton.icon(
-              onPressed: () => unawaited(update.openInstaller()),
-              icon: const Icon(Icons.open_in_new_rounded, size: 16),
-              label: const Text('Open Installer'),
+              onPressed: () => unawaited(update.installUpdate()),
+              icon: const Icon(Icons.restart_alt_rounded, size: 16),
+              label: const Text('Install & Relaunch'),
             ),
           ],
         ),
         const SizedBox(height: 8),
         Text(
-          'Drag the app to Applications to complete the update.',
+          'The app will quit and relaunch with the new version.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
