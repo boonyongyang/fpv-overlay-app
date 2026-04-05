@@ -270,7 +270,8 @@ class BottomActionBar extends StatelessWidget {
             color: theme.colorScheme.surface.withAlpha(245),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-                color: theme.colorScheme.outlineVariant.withAlpha(80),),
+              color: theme.colorScheme.outlineVariant.withAlpha(80),
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withAlpha(60),

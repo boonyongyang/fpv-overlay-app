@@ -19,8 +19,7 @@ void main() {
 
   setUp(() {
     mockService = MockUpdateService();
-    when(() => mockService.checkForUpdate(any()))
-        .thenAnswer((_) async => null);
+    when(() => mockService.checkForUpdate(any())).thenAnswer((_) async => null);
     // currentVersion injected to bypass PackageInfo.fromPlatform()
     provider = UpdateProvider(
       updateService: mockService,

@@ -11,8 +11,7 @@ class HttpUpdateService implements UpdateService {
 
   final http.Client _client;
 
-  static const _manifestUrl =
-      'https://github.com/boonyongyang/fpv-overlay-app'
+  static const _manifestUrl = 'https://github.com/boonyongyang/fpv-overlay-app'
       '/releases/latest/download/latest-macos.json';
 
   @override

@@ -325,7 +325,9 @@ class _CommandPaletteOverlayState extends State<CommandPaletteOverlay> {
   }
 
   OverlayTask? _findSelectedTask(
-      List<OverlayTask> tasks, String? selectedTaskId,) {
+    List<OverlayTask> tasks,
+    String? selectedTaskId,
+  ) {
     if (selectedTaskId == null) return null;
     for (final task in tasks) {
       if (task.id == selectedTaskId) return task;

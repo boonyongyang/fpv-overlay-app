@@ -25,11 +25,13 @@ String buildDiagnosticsReport({
     ..writeln('========================================')
     ..writeln('Generated: ${DateTime.now().toIso8601String()}')
     ..writeln(
-        'Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}',)
+      'Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+    )
     ..writeln('FFmpeg: ${PathResolver.ffmpegPath}')
     ..writeln('Python: ${PathResolver.pythonPath}')
     ..writeln(
-        'Overlay assets: ${PathResolver.o3OverlayToolPath ?? 'Bundled fonts only'}',)
+      'Overlay assets: ${PathResolver.o3OverlayToolPath ?? 'Bundled fonts only'}',
+    )
     ..writeln('Output strategy: $outputStrategy')
     ..writeln(
       'Default output: ${config.defaultOutputDirectory ?? 'Not configured'}',

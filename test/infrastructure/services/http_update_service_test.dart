@@ -12,8 +12,7 @@ void main() {
     http.Response manifest(String version) => http.Response(
           jsonEncode({
             'version': version,
-            'release_url':
-                'https://github.com/example/releases/tag/v$version',
+            'release_url': 'https://github.com/example/releases/tag/v$version',
             'published_at': '2026-03-27T00:00:00Z',
           }),
           200,
@@ -59,8 +58,7 @@ void main() {
     });
 
     test('returns null on malformed JSON', () async {
-      final client =
-          MockClient((_) async => http.Response('not json', 200));
+      final client = MockClient((_) async => http.Response('not json', 200));
       final service = HttpUpdateService(client: client);
       final result = await service.checkForUpdate('1.0.0');
       expect(result, isNull);

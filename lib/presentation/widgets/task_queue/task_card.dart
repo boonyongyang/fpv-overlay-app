@@ -194,7 +194,9 @@ class TaskCard extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _StatusIcon(
-                                    color: statusColor, icon: statusIcon,),
+                                  color: statusColor,
+                                  icon: statusIcon,
+                                ),
                                 const SizedBox(width: 14),
                                 Expanded(child: titleBlock),
                               ],
