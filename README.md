@@ -25,6 +25,7 @@ FPV Overlay Toolbox wraps that into one desktop workflow with one queue, one dia
 - local diagnostics for FFmpeg, Python, output strategy, and bundled overlay assets
 - desktop-native behavior including drag-and-drop, notifications, macOS dock progress, and Windows taskbar progress
 - in-app update check with one-click **Install & Relaunch** on macOS (downloads DMG, verifies SHA256, replaces app bundle and relaunches automatically)
+- **headless CLI** (`fpv-overlay`) for scripting, CI pipelines, or batch-processing without opening the desktop app
 
 ## Install / Download
 
@@ -42,11 +43,38 @@ Download the latest `-setup.exe` from Releases and run it. Windows SmartScreen m
 
 ### CLI (macOS)
 
+A headless command-line tool for the same render pipeline — useful for scripting,
+CI pipelines, SSH sessions, or batch-processing large SD card dumps without opening
+the desktop app.
+
 ```bash
 brew install boonyongyang/tap/fpv-overlay
 ```
 
-Or download a `.tar.gz` archive directly from Releases.
+Or download a `.tar.gz` archive directly from Releases and add `bin/` to your PATH.
+
+**Commands:**
+
+```bash
+# Render a single clip
+fpv-overlay render --video clip.mp4 --srt clip.srt
+fpv-overlay render --video clip.mp4 --osd clip.osd
+fpv-overlay render --video clip.mp4 --srt clip.srt --osd clip.osd --output out.mp4
+
+# Batch-render an entire folder (matches video + telemetry pairs by filename stem)
+fpv-overlay batch --input-dir ./flight-pack --output-dir ./renders
+
+# Check that FFmpeg, Python, and the bundled overlay scripts are all found
+fpv-overlay doctor
+
+# Show version
+fpv-overlay --version
+```
+
+Useful flags: `--overwrite` (skip unique-name suffix), `--dry-run` (plan only, no render).
+
+The CLI ships its own bundled runtime (FFmpeg + overlay executables) so it works
+without a separate FFmpeg or Python install, same as the desktop app.
 
 ### Run From Source
 
