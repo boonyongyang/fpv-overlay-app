@@ -81,17 +81,24 @@ class _AppProviders extends StatelessWidget {
             localStatsService: context.read<LocalStatsService>(),
           )..load(),
         ),
-        ChangeNotifierProxyProvider4<EngineService, CommandRunnerService,
-            OsService, LocalStatsProvider, TaskQueueProvider>(
+        ChangeNotifierProxyProvider5<
+            StorageService,
+            EngineService,
+            CommandRunnerService,
+            OsService,
+            LocalStatsProvider,
+            TaskQueueProvider>(
           create: (context) => TaskQueueProvider(
+            storageService: context.read<StorageService>(),
             engineService: context.read<EngineService>(),
             commandRunnerService: context.read<CommandRunnerService>(),
             osService: context.read<OsService>(),
             localStatsProvider: context.read<LocalStatsProvider>(),
           ),
-          update: (_, engine, runner, os, localStats, previous) =>
+          update: (_, storage, engine, runner, os, localStats, previous) =>
               previous ??
               TaskQueueProvider(
+                storageService: storage,
                 engineService: engine,
                 commandRunnerService: runner,
                 osService: os,

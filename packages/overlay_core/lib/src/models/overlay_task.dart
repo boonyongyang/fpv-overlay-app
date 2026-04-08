@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:path/path.dart' as p;
 
 import 'task_failure.dart';
@@ -105,6 +107,57 @@ class OverlayTask {
       failure: failure,
       logs: List.of(logs),
     );
+  }
+
+  /// Serialises the task for queue persistence.
+  ///
+  /// Transient state (logs, progress, timing, failure details) is not saved.
+  /// A [TaskStatus.processing] task is saved as [TaskStatus.failed] because
+  /// it was interrupted mid-render. [TaskStatus.cancelled] tasks are excluded
+  /// by the caller — they represent user-dismissed work.
+  Map<String, dynamic> toJson() {
+    final savedStatus =
+        status == TaskStatus.processing ? TaskStatus.failed : status;
+    return {
+      'id': id,
+      'createdAt': createdAt.toIso8601String(),
+      if (videoPath != null) 'videoPath': videoPath,
+      if (osdPath != null) 'osdPath': osdPath,
+      if (srtPath != null) 'srtPath': srtPath,
+      'status': savedStatus.name,
+      if (outputPath != null) 'outputPath': outputPath,
+    };
+  }
+
+  factory OverlayTask.fromJson(Map<String, dynamic> json) {
+    return OverlayTask(
+      id: json['id'] as String,
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
+      videoPath: json['videoPath'] as String?,
+      osdPath: json['osdPath'] as String?,
+      srtPath: json['srtPath'] as String?,
+      status: TaskStatus.values.firstWhere(
+        (s) => s.name == json['status'],
+        orElse: () => TaskStatus.pending,
+      ),
+      outputPath: json['outputPath'] as String?,
+    );
+  }
+
+  static List<OverlayTask> listFromJson(String raw) {
+    final list = jsonDecode(raw) as List<dynamic>;
+    return list
+        .map((e) => OverlayTask.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static String listToJson(List<OverlayTask> tasks) {
+    final saveable = tasks
+        .where((t) => t.status != TaskStatus.cancelled)
+        .map((t) => t.toJson())
+        .toList();
+    return jsonEncode(saveable);
   }
 
   @override

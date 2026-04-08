@@ -1,7 +1,9 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fpv_overlay_app/domain/models/app_configuration.dart';
+import 'package:fpv_overlay_app/domain/models/overlay_task.dart';
 
 class StorageService {
+  static const String _taskQueueKey = 'task_queue';
   static const String _lastInputKey = 'last_input_dir';
   static const String _lastOutputKey = 'last_output_dir';
   static const String _defaultOutputKey = 'default_output_dir';
@@ -61,8 +63,30 @@ class StorageService {
     );
   }
 
+  Future<List<OverlayTask>?> loadTaskQueue() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_taskQueueKey);
+    if (raw == null) return null;
+    try {
+      return OverlayTask.listFromJson(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveTaskQueue(List<OverlayTask> tasks) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_taskQueueKey, OverlayTask.listToJson(tasks));
+  }
+
+  Future<void> clearTaskQueue() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_taskQueueKey);
+  }
+
   Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_taskQueueKey);
     await prefs.remove(_lastInputKey);
     await prefs.remove(_lastOutputKey);
     await prefs.remove(_defaultOutputKey);

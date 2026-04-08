@@ -13,6 +13,7 @@ import 'package:fpv_overlay_app/domain/services/task_failure_parser.dart';
 
 import 'package:fpv_overlay_app/infrastructure/services/engine_service.dart';
 import 'package:fpv_overlay_app/infrastructure/services/command_runner_service.dart';
+import 'package:fpv_overlay_app/infrastructure/services/storage_service.dart';
 import 'package:fpv_overlay_app/infrastructure/runtime/path_resolver_runtime.dart';
 import 'package:fpv_overlay_app/domain/services/os_service.dart';
 
@@ -21,6 +22,7 @@ class TaskQueueProvider extends ChangeNotifier {
   final CommandRunnerService _commandRunnerService;
   final OsService _osService;
   final LocalStatsProvider _localStatsProvider;
+  final StorageService? _storageService;
   final OverlayTaskPlanner _taskPlanner;
   final OverlayProgressParser _progressParser;
 
@@ -34,24 +36,41 @@ class TaskQueueProvider extends ChangeNotifier {
     required CommandRunnerService commandRunnerService,
     required OsService osService,
     required LocalStatsProvider localStatsProvider,
+    StorageService? storageService,
     OverlayTaskPlanner? taskPlanner,
     OverlayProgressParser? progressParser,
   })  : _engineService = engineService,
         _commandRunnerService = commandRunnerService,
         _osService = osService,
         _localStatsProvider = localStatsProvider,
+        _storageService = storageService,
         _taskPlanner = taskPlanner ?? OverlayTaskPlanner(),
-        _progressParser = progressParser ?? const OverlayProgressParser();
+        _progressParser = progressParser ?? const OverlayProgressParser() {
+    _restoreQueue();
+  }
 
   List<OverlayTask> get tasks => List.unmodifiable(_tasks);
   bool get isProcessing => _isProcessing;
   bool get isCancelling => _cancelRequested;
   bool get willClearAfterCancel => _clearAfterCancel;
 
+  Future<void> _restoreQueue() async {
+    final stored = await _storageService?.loadTaskQueue();
+    if (stored == null || stored.isEmpty) return;
+    _tasks.addAll(stored);
+    _updateDockState();
+    notifyListeners();
+  }
+
+  Future<void> _saveQueue() async {
+    await _storageService?.saveTaskQueue(_tasks);
+  }
+
   void addTask(OverlayTask task) {
     _tasks.add(task);
     _updateDockState();
     notifyListeners();
+    unawaited(_saveQueue());
   }
 
   void addManualTask({
@@ -86,6 +105,7 @@ class TaskQueueProvider extends ChangeNotifier {
         incoming.isNotEmpty) {
       _updateDockState();
       notifyListeners();
+      unawaited(_saveQueue());
     }
 
     return result;
@@ -104,12 +124,14 @@ class TaskQueueProvider extends ChangeNotifier {
     );
     _updateDockState();
     notifyListeners();
+    unawaited(_saveQueue());
   }
 
   void removeTask(String id) {
     _tasks.removeWhere((t) => t.id == id && t.status != TaskStatus.processing);
     _updateDockState();
     notifyListeners();
+    unawaited(_saveQueue());
   }
 
   void cancelQueue() {
@@ -141,12 +163,14 @@ class TaskQueueProvider extends ChangeNotifier {
     );
     _updateDockState();
     notifyListeners();
+    unawaited(_saveQueue());
   }
 
   void clearAll() {
     _tasks.removeWhere((t) => t.status != TaskStatus.processing);
     _updateDockState();
     notifyListeners();
+    unawaited(_saveQueue());
   }
 
   void _updateDockState() {
@@ -278,6 +302,7 @@ class TaskQueueProvider extends ChangeNotifier {
         unawaited(_localStatsProvider.recordRun(task));
         _updateDockState();
         notifyListeners();
+        unawaited(_saveQueue());
         if (_cancelRequested) break;
       }
     }
@@ -291,6 +316,7 @@ class TaskQueueProvider extends ChangeNotifier {
       _tasks.clear();
       _updateDockState();
       notifyListeners();
+      unawaited(_saveQueue());
       return;
     }
 

@@ -21,11 +21,13 @@ FPV Overlay Toolbox wraps that into one desktop workflow with one queue, one dia
 - full graphical overlays from `.osd`
 - combined `.osd` + `.srt` renders in one output
 - DJI split-recording recovery where a later clip can reuse an earlier `.osd`
+- recursive folder scanning — scan an entire SD card dump and match files per subfolder
 - overview-first queue management with clear-all actions and render activity views
 - local diagnostics for FFmpeg, Python, output strategy, and bundled overlay assets
 - desktop-native behavior including drag-and-drop, notifications, macOS dock progress, and Windows taskbar progress
 - in-app update check with one-click **Install & Relaunch** on macOS (downloads DMG, verifies SHA256, replaces app bundle and relaunches automatically)
 - **headless CLI** (`fpv-overlay`) for scripting, CI pipelines, or batch-processing without opening the desktop app
+- **queue persistence** — tasks survive app restarts; interrupted renders are marked failed so you can retry
 
 ## Install / Download
 
@@ -63,6 +65,9 @@ fpv-overlay render --video clip.mp4 --srt clip.srt --osd clip.osd --output out.m
 
 # Batch-render an entire folder (matches video + telemetry pairs by filename stem)
 fpv-overlay batch --input-dir ./flight-pack --output-dir ./renders
+
+# Batch-render recursively (SD card dump with nested folders)
+fpv-overlay batch --input-dir ./sd-card --recursive
 
 # Check that FFmpeg, Python, and the bundled overlay scripts are all found
 fpv-overlay doctor
