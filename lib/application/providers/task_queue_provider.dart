@@ -66,7 +66,10 @@ class TaskQueueProvider extends ChangeNotifier {
   }
 
   Future<TaskAdditionResult> addTasksFromDirectory(String directoryPath) async {
-    final incoming = await _engineService.findFilePairs(directoryPath);
+    final incoming = await _engineService.findFilePairs(
+      directoryPath,
+      recursive: true,
+    );
     return _processNewTasks(incoming);
   }
 

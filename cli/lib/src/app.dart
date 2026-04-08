@@ -123,6 +123,7 @@ Future<int> _runBatch(List<String> args, CliRuntime runtime) async {
     ..addFlag('help', abbr: 'h', negatable: false)
     ..addOption('input-dir')
     ..addOption('output-dir')
+    ..addFlag('recursive', abbr: 'r', negatable: false)
     ..addFlag('overwrite', negatable: false)
     ..addFlag('dry-run', negatable: false)
     ..addFlag('verbose', negatable: false);
@@ -135,6 +136,7 @@ Future<int> _runBatch(List<String> args, CliRuntime runtime) async {
   }
 
   final inputDir = results['input-dir'] as String?;
+  final recursive = results['recursive'] == true;
   final overwrite = results['overwrite'] == true;
   final dryRun = results['dry-run'] == true;
   if (inputDir == null || inputDir.isEmpty) {
@@ -150,7 +152,7 @@ Future<int> _runBatch(List<String> args, CliRuntime runtime) async {
       (results['output-dir'] as String?) ?? p.join(inputDir, 'renders');
   final engine = EngineService();
   final planner = OverlayTaskPlanner();
-  final tasks = await engine.findFilePairs(inputDir);
+  final tasks = await engine.findFilePairs(inputDir, recursive: recursive);
 
   final renderable = tasks
       .where(
@@ -369,6 +371,7 @@ Scan a folder and render all valid tasks.
 
 Usage:
   fpv-overlay batch --input-dir ./flight-pack [--output-dir ./renders]
+  fpv-overlay batch --input-dir ./sd-card --recursive
 
 Options:
 ${parser.usage}

@@ -14,18 +14,38 @@ class EngineService {
   EngineService({FileSystem? fileSystem})
       : _fileSystem = fileSystem ?? const LocalFileSystem();
 
-  Future<List<OverlayTask>> findFilePairs(String inputDirPath) async {
+  Future<List<OverlayTask>> findFilePairs(
+    String inputDirPath, {
+    bool recursive = false,
+  }) async {
     final inputDir = _fileSystem.directory(inputDirPath);
     if (!await inputDir.exists()) {
       throw Exception('Input directory does not exist: $inputDirPath');
     }
 
-    final List<File> files = [];
-    await for (final entity in inputDir.list()) {
-      if (entity is File) files.add(entity);
+    if (!recursive) {
+      final List<File> files = [];
+      await for (final entity in inputDir.list()) {
+        if (entity is File) files.add(entity);
+      }
+      return _matchFiles(files.map((f) => f.path).toList());
     }
 
-    return _matchFiles(files.map((f) => f.path).toList());
+    // Recursive scan: group files by their parent directory so that
+    // matching and OSD fallback logic stay scoped per folder.
+    final dirGroups = <String, List<String>>{};
+    await for (final entity in inputDir.list(recursive: true)) {
+      if (entity is File) {
+        final dir = p.dirname(entity.path);
+        (dirGroups[dir] ??= []).add(entity.path);
+      }
+    }
+
+    final results = <OverlayTask>[];
+    for (final paths in dirGroups.values) {
+      results.addAll(await _matchFiles(paths));
+    }
+    return results;
   }
 
   Future<List<OverlayTask>> findPairsFromFiles(List<String> filePaths) async {

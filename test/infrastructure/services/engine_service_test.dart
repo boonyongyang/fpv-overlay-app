@@ -251,4 +251,85 @@ void main() {
       expect(task30.srtPath, '/data/DJIG0030.srt');
     });
   });
+
+  group('EngineService - Recursive scanning', () {
+    test('Should find pairs in nested subdirectories', () async {
+      fs.file('/sd/day1/DJIG0001.mp4').createSync(recursive: true);
+      fs.file('/sd/day1/DJIG0001.srt')
+        ..createSync()
+        ..writeAsStringSync('srt');
+      fs.file('/sd/day2/DJIG0001.mp4').createSync(recursive: true);
+      fs.file('/sd/day2/DJIG0001.osd')
+        ..createSync()
+        ..writeAsStringSync('osd');
+
+      final tasks = await service.findFilePairs('/sd', recursive: true);
+
+      expect(tasks.length, 2);
+      final srtTask = tasks.firstWhere((t) => t.srtPath != null);
+      expect(srtTask.type, OverlayType.srt);
+      final osdTask = tasks.firstWhere((t) => t.osdPath != null);
+      expect(osdTask.type, OverlayType.osd);
+    });
+
+    test('Should not cross-match files from different subdirectories',
+        () async {
+      // DJIG0001.mp4 in day1 must NOT pick up DJIG0001.srt in day2
+      fs.file('/sd/day1/DJIG0001.mp4').createSync(recursive: true);
+      fs.file('/sd/day2/DJIG0001.srt')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('srt');
+
+      final tasks = await service.findFilePairs('/sd', recursive: true);
+
+      final videoTask =
+          tasks.firstWhere((t) => t.videoPath?.contains('day1') ?? false);
+      expect(videoTask.status, TaskStatus.missingTelemetry);
+      expect(videoTask.srtPath, isNull);
+    });
+
+    test('Should apply OSD fallback within each subdirectory independently',
+        () async {
+      // day1: DJIG0077 has OSD, DJIG0078 should inherit it
+      fs.file('/sd/day1/DJIG0077.mp4').createSync(recursive: true);
+      fs.file('/sd/day1/DJIG0077.osd')
+        ..createSync()
+        ..writeAsStringSync('osd');
+      fs.file('/sd/day1/DJIG0078.mp4').createSync();
+
+      // day2: independent flight — DJIG0077.osd here must NOT bleed into day1
+      fs.file('/sd/day2/DJIG0099.mp4').createSync(recursive: true);
+      fs.file('/sd/day2/DJIG0099.osd')
+        ..createSync()
+        ..writeAsStringSync('osd99');
+
+      final tasks = await service.findFilePairs('/sd', recursive: true);
+
+      final task78 =
+          tasks.firstWhere((t) => t.videoPath?.contains('0078') ?? false);
+      expect(task78.status, TaskStatus.pending);
+      expect(task78.osdPath, '/sd/day1/DJIG0077.osd');
+
+      final task99 =
+          tasks.firstWhere((t) => t.videoPath?.contains('0099') ?? false);
+      expect(task99.osdPath, '/sd/day2/DJIG0099.osd');
+    });
+
+    test('Non-recursive scan should not find files in subdirectories',
+        () async {
+      fs.file('/data/top.mp4').createSync(recursive: true);
+      fs.file('/data/top.srt')
+        ..createSync()
+        ..writeAsStringSync('srt');
+      fs.file('/data/sub/nested.mp4').createSync(recursive: true);
+      fs.file('/data/sub/nested.srt')
+        ..createSync()
+        ..writeAsStringSync('srt');
+
+      final tasks = await service.findFilePairs('/data');
+
+      expect(tasks.length, 1);
+      expect(tasks.first.videoPath, '/data/top.mp4');
+    });
+  });
 }
